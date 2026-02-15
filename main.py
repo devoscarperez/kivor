@@ -81,7 +81,9 @@ def ganancias_por_mes(mes: str):
             "data": result
         }
 
-
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+        
 @app.post("/login-username")
 def login_username(data: dict = Body(...)):
     username = data.get("username")
@@ -107,7 +109,5 @@ def login_username(data: dict = Body(...)):
 
         return {"status": "ok", "username": username}
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

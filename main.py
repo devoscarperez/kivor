@@ -120,6 +120,9 @@ def login(data: dict = Body(...)):
     if not username or not password:
         raise HTTPException(status_code=400, detail="Usuario y clave requeridos")
 
+    # 🔥 NORMALIZAR AQUÍ
+    username = username.strip().lower()
+
     query = """
     SELECT password_hash
     FROM public.gebruiker

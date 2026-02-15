@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Body
 import os
 import psycopg
 
@@ -82,5 +83,33 @@ def ganancias_por_mes(mes: str):
             "data": result
         }
 
+
+    @app.post("/login-username")
+def login_username(data: dict = Body(...)):
+    username = data.get("username")
+
+    if not username:
+        raise HTTPException(status_code=400, detail="Usuario requerido")
+
+    query = """
+    SELECT id
+    FROM public.gebruiker
+    WHERE username = %s
+      AND active = TRUE;
+    """
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (username,))
+                user = cur.fetchone()
+
+        if not user:
+            raise HTTPException(status_code=401, detail="Usuario no válido")
+
+        return {"status": "ok", "username": username}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

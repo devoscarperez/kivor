@@ -1,8 +1,21 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import os
 import psycopg
 
+
+
+
 app = FastAPI(title="KIVOR Backend")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # En producción luego lo restringimos
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 
 def get_connection():

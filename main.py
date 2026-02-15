@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import Body
 import os
 import psycopg
+import hashlib
 
 
 app = FastAPI(title="KIVOR Backend")
@@ -111,3 +112,39 @@ def login_username(data: dict = Body(...)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@app.post("/login-password")
+def login_password(data: dict = Body(...)):
+    username = data.get("username")
+    password = data.get("password")
+
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Usuario y clave requeridos")
+
+    # Generar hash SHA256 igual que en la base
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+    query = """
+    SELECT id
+    FROM public.gebruiker
+    WHERE username = %s
+      AND password_hash = %s
+      AND active = TRUE;
+    """
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (username, password_hash))
+                user = cur.fetchone()
+
+        if not user:
+            raise HTTPException(status_code=401, detail="Clave incorrecta")
+
+        return {"status": "login_ok", "username": username}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

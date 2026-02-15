@@ -82,7 +82,7 @@ def ganancias_por_mes(mes: str):
         }
 
 
-    @app.post("/login-username")
+@app.post("/login-username")
 def login_username(data: dict = Body(...)):
     username = data.get("username")
 

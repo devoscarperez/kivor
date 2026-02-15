@@ -19,13 +19,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-SECRET_KEY = "cambia_esto_por_un_string_largo_y_seguro"
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 security = HTTPBearer()
 
 
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Token inválido")
+        return username
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido")
 
 def get_connection():
     database_url = os.getenv("DATABASE_URL")
@@ -57,7 +74,8 @@ def test_db():
 
 
 @app.get("/ganancias-por-mes")
-def ganancias_por_mes(mes: str):
+def ganancias_por_mes(mes: str, current_user: str = Depends(verify_token)):
+
     if not mes.isdigit() or len(mes) != 2 or int(mes) < 1 or int(mes) > 12:
         raise HTTPException(status_code=400, detail="Mes inválido. Usa formato 01-12.")
 
@@ -94,15 +112,16 @@ def ganancias_por_mes(mes: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
         
-@app.post("/login-username")
-def login_username(data: dict = Body(...)):
+@app.post("/login")
+def login(data: dict = Body(...)):
     username = data.get("username")
+    password = data.get("password")
 
-    if not username:
-        raise HTTPException(status_code=400, detail="Usuario requerido")
+    if not username or not password:
+        raise HTTPException(status_code=400, detail="Usuario y clave requeridos")
 
     query = """
-    SELECT id
+    SELECT password_hash
     FROM public.gebruiker
     WHERE username = %s
       AND active = TRUE;
@@ -115,53 +134,27 @@ def login_username(data: dict = Body(...)):
                 user = cur.fetchone()
 
         if not user:
-            raise HTTPException(status_code=401, detail="Usuario no válido")
+            raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-        return {"status": "ok", "username": username}
+        stored_password = user[0]
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Comparación simple (porque tu hash es SHA256)
+        import hashlib
+        hashed_input = hashlib.sha256(password.encode()).hexdigest()
 
+        if hashed_input != stored_password:
+            raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
+        access_token = create_access_token({"sub": username})
 
-@app.post("/login-password")
-def login_password(data: dict = Body(...)):
-    username = data.get("username")
-    password = data.get("password")
-
-    if not username or not password:
-        raise HTTPException(status_code=400, detail="Usuario y clave requeridos")
-
-    # Generar hash SHA256 igual que en la base
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
-
-    query = """
-    SELECT id
-    FROM public.gebruiker
-    WHERE username = %s
-      AND password_hash = %s
-      AND active = TRUE;
-    """
-
-    try:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(query, (username, password_hash))
-                user = cur.fetchone()
-
-        if not user:
-            raise HTTPException(status_code=401, detail="Clave incorrecta")
-
-        return {"status": "login_ok", "username": username}
+        return {
+            "access_token": access_token,
+            "token_type": "bearer"
+        }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def create_access_token(data: dict, expires_delta: timedelta = None):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+
 
 

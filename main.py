@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 import os
-import psycopg2
+import psycopg
 
 app = FastAPI(title="KIVOR Backend")
 
@@ -9,7 +9,7 @@ def get_connection():
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
         raise Exception("DATABASE_URL no está configurada")
-    return psycopg2.connect(database_url)
+    return psycopg.connect(database_url)
 
 
 @app.get("/")

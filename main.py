@@ -5,8 +5,6 @@ import os
 import psycopg
 
 
-
-
 app = FastAPI(title="KIVOR Backend")
 
 app.add_middleware(

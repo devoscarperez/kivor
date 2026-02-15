@@ -111,7 +111,36 @@ def ganancias_por_mes(mes: str, current_user: str = Depends(verify_token)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-        
+
+@app.post("/login-username")
+def login_username(data: dict = Body(...)):
+    username = data.get("username")
+
+    if not username:
+        raise HTTPException(status_code=400, detail="Usuario requerido")
+
+    # 🔥 NORMALIZAR AQUÍ
+    username = username.strip().lower()
+    
+    query = """
+    SELECT id
+    FROM public.gebruiker
+    WHERE username = %s
+      AND active = TRUE;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (username,))
+            user = cur.fetchone()
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuario no válido")
+
+    return {"status": "ok"}
+
+
+
 @app.post("/login")
 def login(data: dict = Body(...)):
     username = data.get("username")
@@ -120,9 +149,6 @@ def login(data: dict = Body(...)):
     if not username or not password:
         raise HTTPException(status_code=400, detail="Usuario y clave requeridos")
 
-    # 🔥 NORMALIZAR AQUÍ
-    username = username.strip().lower()
-
     query = """
     SELECT password_hash
     FROM public.gebruiker
@@ -130,33 +156,28 @@ def login(data: dict = Body(...)):
       AND active = TRUE;
     """
 
-    try:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(query, (username,))
-                user = cur.fetchone()
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (username,))
+            user = cur.fetchone()
 
-        if not user:
-            raise HTTPException(status_code=401, detail="Credenciales inválidas")
+    if not user:
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-        stored_password = user[0]
+    stored_password = user[0]
 
-        # Comparación simple (porque tu hash es SHA256)
-        import hashlib
-        hashed_input = hashlib.sha256(password.encode()).hexdigest()
+    import hashlib
+    hashed_input = hashlib.sha256(password.encode()).hexdigest()
 
-        if hashed_input != stored_password:
-            raise HTTPException(status_code=401, detail="Credenciales inválidas")
+    if hashed_input != stored_password:
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-        access_token = create_access_token({"sub": username})
+    access_token = create_access_token({"sub": username})
 
-        return {
-            "access_token": access_token,
-            "token_type": "bearer"
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 
 

@@ -32,3 +32,4 @@ def test_db():
         return {"db_connection": "ok", "result": result[0]}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+

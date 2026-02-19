@@ -263,4 +263,27 @@ def obtener_nivel2(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/niveles3")
+def obtener_nivel3(
+    family: str,
+    level2: str,
+    current_user: str = Depends(verify_token)
+):
+    query = """
+    SELECT DISTINCT level3
+    FROM public.prijs
+    WHERE family = %s
+    AND level2 = %s
+    AND level3 IS NOT NULL
+    ORDER BY level3;
+    """
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, (family, level2))
+                rows = cur.fetchall()
+                return [r[0] for r in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 

@@ -223,6 +223,23 @@ def obtener_precios(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/familias")
+def obtener_familias(current_user: str = Depends(verify_token)):
+    query = """
+    SELECT DISTINCT family
+    FROM public.prijs
+    WHERE family IS NOT NULL
+    ORDER BY family;
+    """
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query)
+                rows = cur.fetchall()
+                return [r[0] for r in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 

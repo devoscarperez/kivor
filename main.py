@@ -312,3 +312,47 @@ def obtener_nivel4(
                 return [r[0] for r in rows]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@app.get("/precios")
+def obtener_precios(
+    family: str,
+    level2: str = None,
+    level3: str = None,
+    level4: str = None,
+    current_user: str = Depends(verify_token)
+):
+    query = """
+    SELECT servicekey,
+           listprice,
+           professionalprice,
+           salonpercentage,
+           professionalpercentage
+    FROM public.prijs
+    WHERE family = %s
+    """
+
+    params = [family]
+
+    if level2:
+        query += " AND level2 = %s"
+        params.append(level2)
+
+    if level3:
+        query += " AND level3 = %s"
+        params.append(level3)
+
+    if level4:
+        query += " AND level4 = %s"
+        params.append(level4)
+
+    query += " ORDER BY servicekey"
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, tuple(params))
+            columns = [desc[0] for desc in cur.description]
+            rows = cur.fetchall()
+            return [dict(zip(columns, row)) for row in rows]
+

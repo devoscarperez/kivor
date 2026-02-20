@@ -324,7 +324,11 @@ def obtener_precios(
     current_user: str = Depends(verify_token)
 ):
     query = """
-    SELECT servicekey,
+    SELECT family,
+           level2,
+           level3,
+           level4,
+           servicekey,
            listprice,
            professionalprice,
            salonpercentage,
@@ -355,4 +359,3 @@ def obtener_precios(
             columns = [desc[0] for desc in cur.description]
             rows = cur.fetchall()
             return [dict(zip(columns, row)) for row in rows]
-

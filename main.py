@@ -8,7 +8,21 @@ from fastapi import Body
 import os
 import psycopg
 import hashlib
+from pydantic import BaseModel
+from typing import Optional
+from fastapi import HTTPException, Depends, Request
 
+
+# =========================
+# MODELOS
+# =========================
+
+class PrecioUpdate(BaseModel):
+    listprice: Optional[int] = None
+    professionalprice: Optional[int] = None
+    salonpercentage: Optional[int] = None
+    professionalpercentage: Optional[int] = None
+    reason_id: int  # obligatorio
 
 app = FastAPI(title="KIVOR Backend")
 
@@ -43,7 +57,38 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         return username
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido")
+# =========================
+# CONTROL PERMISO ESCRITURA DATOS
+# =========================
 
+def require_data_write_permission(username: str):
+
+    query = """
+    SELECT 1
+    FROM public.gebruiker g
+    JOIN public.toegekend t
+      ON g."group" = t."group"
+    WHERE g.username = %s
+      AND g.active = TRUE
+      AND t.role = 'AD'
+      AND t.right = 777
+    LIMIT 1;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (username,))
+            row = cur.fetchone()
+
+    if not row:
+        raise HTTPException(
+            status_code=403,
+            detail="Sin permisos de escritura de datos"
+        )
+
+
+def require_admin(username: str):
+    
 def get_connection():
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
@@ -179,49 +224,6 @@ def login(data: dict = Body(...)):
         "token_type": "bearer"
     }
 
-
-@app.get("/precios")
-def obtener_precios(
-    family: str,
-    level2: str = None,
-    level3: str = None,
-    level4: str = None,
-    current_user: str = Depends(verify_token)
-):
-    query = """
-    SELECT servicekey, family, level2, level3, level4,
-           listprice, professionalprice,
-           salonpercentage, professionalpercentage
-    FROM public.prijs
-    WHERE family = %s
-    """
-
-    params = [family]
-
-    if level2:
-        query += " AND level2 = %s"
-        params.append(level2)
-
-    if level3:
-        query += " AND level3 = %s"
-        params.append(level3)
-
-    if level4:
-        query += " AND level4 = %s"
-        params.append(level4)
-
-    query += " ORDER BY level2, level3, level4"
-
-    try:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(query, tuple(params))
-                columns = [desc[0] for desc in cur.description]
-                rows = cur.fetchall()
-                result = [dict(zip(columns, row)) for row in rows]
-                return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/familias")
 def obtener_familias(current_user: str = Depends(verify_token)):

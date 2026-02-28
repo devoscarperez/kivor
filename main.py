@@ -229,7 +229,7 @@ def login(data: dict = Body(...)):
 def obtener_familias(current_user: str = Depends(verify_token)):
     query = """
     SELECT DISTINCT family
-    FROM public.prijs
+    FROM core.prices
     WHERE family IS NOT NULL
     ORDER BY family;
     """
@@ -250,7 +250,7 @@ def obtener_nivel2(
 ):
     query = """
     SELECT DISTINCT level2
-    FROM public.prijs
+    FROM core.prices
     WHERE family = %s
     AND level2 IS NOT NULL
     ORDER BY level2;
@@ -273,7 +273,7 @@ def obtener_nivel3(
 ):
     query = """
     SELECT DISTINCT level3
-    FROM public.prijs
+    FROM core.prices
     WHERE family = %s
     AND level2 = %s
     AND level3 IS NOT NULL
@@ -298,7 +298,7 @@ def obtener_nivel4(
 ):
     query = """
     SELECT DISTINCT level4
-    FROM public.prijs
+    FROM core.prices
     WHERE family = %s
     AND level2 = %s
     AND level3 = %s

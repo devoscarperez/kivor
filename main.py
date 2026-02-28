@@ -86,7 +86,7 @@ def get_connection():
     return psycopg.connect(database_url)
     
 
-def require_admin(username: str):
+# def require_admin(username: str):
     
 def get_connection():
     database_url = os.getenv("DATABASE_URL")

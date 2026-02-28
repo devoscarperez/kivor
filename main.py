@@ -366,23 +366,24 @@ def obtener_precios(
 @app.get("/menu")
 def get_menu(current_user: dict = Depends(verify_token)):
 
-    group_id = current_user["group_id"]
+    group_id = current_user.get("group_id")
+
+    if not group_id:
+        raise HTTPException(status_code=400, detail="Usuario sin grupo")
 
     query = """
     SELECT DISTINCT
         m.menu_id,
         m.menu_name,
         m.menu_path,
-        m.menu_icon,
         m.menu_parent_id,
-        m.menu_order,
-        m.menu_level
+        m.menu_order
     FROM core.menu m
     JOIN core.role_menu rm ON m.menu_id = rm.menu_id
     JOIN core.group_role gr ON rm.role_id = gr.role_id
     WHERE gr.group_id = %s
       AND m.menu_active = TRUE
-    ORDER BY m.menu_level, m.menu_order;
+    ORDER BY m.menu_order;
     """
 
     with get_connection() as conn:

@@ -69,29 +69,28 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 # CONTROL PERMISO ESCRITURA DATOS
 # =========================
 
-def require_data_write_permission(username: str):
+def require_permission(current_user: dict, required_right: str):
+
+    group_id = current_user.get("group_id")
 
     query = """
     SELECT 1
-    FROM public.gebruiker g
-    JOIN public.toegekend t
-      ON g."group" = t."group"
-    WHERE g.username = %s
-      AND g.active = TRUE
-      AND t.role = 'AD'
-      AND t.right = 777
+    FROM core.group_role gr
+    JOIN core.role r ON gr.role_id = r.role_id
+    WHERE gr.group_id = %s
+      AND r.role_right = %s
     LIMIT 1;
     """
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(query, (username,))
+            cur.execute(query, (group_id, required_right))
             row = cur.fetchone()
 
     if not row:
         raise HTTPException(
             status_code=403,
-            detail="Sin permisos de escritura de datos"
+            detail=f"Sin permiso: {required_right}"
         )
 
 

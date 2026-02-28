@@ -66,40 +66,8 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido")
 # =========================
-# CONTROL PERMISO ESCRITURA DATOS
-# =========================
-
-# =========================
 # CONTROL PERMISOS
 # =========================
-
-def require_data_write_permission(current_user: dict):
-
-    group_id = current_user.get("group_id")
-
-    if not group_id:
-        raise HTTPException(status_code=401, detail="Token inválido")
-
-    query = """
-    SELECT 1
-    FROM core.group_role gr
-    JOIN core.role r ON gr.role_id = r.role_id
-    WHERE gr.group_id = %s
-      AND r.role_right = 'DATA_WRITE'
-    LIMIT 1;
-    """
-
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(query, (group_id,))
-            row = cur.fetchone()
-
-    if not row:
-        raise HTTPException(
-            status_code=403,
-            detail="Sin permisos de escritura"
-        )
-
 
 def get_connection():
     database_url = os.getenv("DATABASE_URL")

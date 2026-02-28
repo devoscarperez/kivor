@@ -65,8 +65,18 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido")
+
+
 # =========================
 # CONTROL PERMISOS
+# =========================
+
+def require_data_write_permission(current_user: dict):
+    pass
+
+
+# =========================
+# CONEXIÓN DB
 # =========================
 
 def get_connection():

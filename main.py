@@ -51,10 +51,18 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
         username: str = payload.get("sub")
+        group_id: int = payload.get("group_id")
+
         if username is None:
             raise HTTPException(status_code=401, detail="Token inválido")
-        return username
+
+        return {
+            "username": username,
+            "group_id": group_id
+        }
+
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido")
 # =========================
@@ -164,14 +172,13 @@ def login_username(data: dict = Body(...)):
     if not username:
         raise HTTPException(status_code=400, detail="Usuario requerido")
 
-    # 🔥 NORMALIZAR AQUÍ
     username = username.strip().lower()
-    
+
     query = """
-    SELECT id
-    FROM public.gebruiker
-    WHERE username = %s
-      AND active = TRUE;
+    SELECT user_id
+    FROM core."user"
+    WHERE user_name = %s
+      AND user_active = TRUE;
     """
 
     with get_connection() as conn:
@@ -195,10 +202,10 @@ def login(data: dict = Body(...)):
         raise HTTPException(status_code=400, detail="Usuario y clave requeridos")
 
     query = """
-    SELECT password_hash
-    FROM public.gebruiker
-    WHERE username = %s
-      AND active = TRUE;
+    SELECT user_password_hash, user_group_id
+    FROM core."user"
+    WHERE user_name = %s
+      AND user_active = TRUE;
     """
 
     with get_connection() as conn:
@@ -210,20 +217,22 @@ def login(data: dict = Body(...)):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
     stored_password = user[0]
+    group_id = user[1]
 
-    import hashlib
     hashed_input = hashlib.sha256(password.encode()).hexdigest()
 
     if hashed_input != stored_password:
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-    access_token = create_access_token({"sub": username})
+    access_token = create_access_token({
+        "sub": username,
+        "group_id": group_id
+    })
 
     return {
         "access_token": access_token,
         "token_type": "bearer"
     }
-
 
 @app.get("/familias")
 def obtener_familias(current_user: str = Depends(verify_token)):
@@ -361,3 +370,34 @@ def obtener_precios(
             columns = [desc[0] for desc in cur.description]
             rows = cur.fetchall()
             return [dict(zip(columns, row)) for row in rows]
+
+
+@app.get("/menu")
+def get_menu(current_user: dict = Depends(verify_token)):
+
+    group_id = current_user["group_id"]
+
+    query = """
+    SELECT DISTINCT
+        m.menu_id,
+        m.menu_name,
+        m.menu_path,
+        m.menu_icon,
+        m.menu_parent_id,
+        m.menu_order,
+        m.menu_level
+    FROM core.menu m
+    JOIN core.role_menu rm ON m.menu_id = rm.menu_id
+    JOIN core.group_role gr ON rm.role_id = gr.role_id
+    WHERE gr.group_id = %s
+      AND m.menu_active = TRUE
+    ORDER BY m.menu_level, m.menu_order;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (group_id,))
+            columns = [desc[0] for desc in cur.description]
+            rows = cur.fetchall()
+
+    return [dict(zip(columns, row)) for row in rows]

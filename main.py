@@ -69,30 +69,44 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 # CONTROL PERMISO ESCRITURA DATOS
 # =========================
 
-def require_permission(current_user: dict, required_right: str):
+# =========================
+# CONTROL PERMISOS
+# =========================
+
+def require_data_write_permission(current_user: dict):
 
     group_id = current_user.get("group_id")
+
+    if not group_id:
+        raise HTTPException(status_code=401, detail="Token inválido")
 
     query = """
     SELECT 1
     FROM core.group_role gr
     JOIN core.role r ON gr.role_id = r.role_id
     WHERE gr.group_id = %s
-      AND r.role_right = %s
+      AND r.role_right = 'DATA_WRITE'
     LIMIT 1;
     """
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(query, (group_id, required_right))
+            cur.execute(query, (group_id,))
             row = cur.fetchone()
 
     if not row:
         raise HTTPException(
             status_code=403,
-            detail=f"Sin permiso: {required_right}"
+            detail="Sin permisos de escritura"
         )
 
+
+def get_connection():
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise Exception("DATABASE_URL no está configurada")
+    return psycopg.connect(database_url)
+    
 
 def require_admin(username: str):
     

@@ -377,16 +377,16 @@ def get_menu(current_user: dict = Depends(verify_token)):
         WHERE gr.group_id = %s
           AND m.menu_active = TRUE
     ),
-    parents AS (
-        SELECT p.*
-        FROM core.menu p
-        WHERE p.menu_id IN (
-            SELECT menu_parent_id FROM permitted WHERE menu_parent_id IS NOT NULL
-        )
+    recursive_menu AS (
+        SELECT * FROM permitted
+        UNION
+        SELECT parent.*
+        FROM core.menu parent
+        JOIN recursive_menu child
+          ON child.menu_parent_id = parent.menu_id
     )
-    SELECT * FROM permitted
-    UNION
-    SELECT * FROM parents
+    SELECT DISTINCT *
+    FROM recursive_menu
     ORDER BY menu_order;
     """
 

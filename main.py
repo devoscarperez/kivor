@@ -335,7 +335,7 @@ def obtener_precios(
            professionalprice,
            salonpercentage,
            professionalpercentage
-    FROM public.prijs
+    FROM core.prices
     WHERE family = %s
     """
 

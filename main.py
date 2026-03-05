@@ -68,13 +68,15 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
         username = payload.get("sub")
         group_id = payload.get("group_id")
+        jti = payload.get("jti")
 
-        if username is None:
+        if username is None or jti is None:
             raise HTTPException(status_code=401, detail="Token inválido")
 
         return {
             "username": username,
-            "group_id": group_id
+            "group_id": group_id,
+            "jti": jti
         }
 
     except JWTError:

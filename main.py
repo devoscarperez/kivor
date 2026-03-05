@@ -57,12 +57,17 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     return encoded_jwt
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+
+    if not SECRET_KEY:
+        raise HTTPException(status_code=500, detail="SECRET_KEY no configurado")
+
     token = credentials.credentials
+
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
-        username: str = payload.get("sub")
-        group_id: int = payload.get("group_id")
+        username = payload.get("sub")
+        group_id = payload.get("group_id")
 
         if username is None:
             raise HTTPException(status_code=401, detail="Token inválido")
@@ -73,7 +78,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         }
 
     except JWTError:
-        raise HTTPException(status_code=401, detail="Token inválido")
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
 
 
 # =========================

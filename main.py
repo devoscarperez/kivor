@@ -68,15 +68,36 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
         username = payload.get("sub")
         group_id = payload.get("group_id")
-        jti = payload.get("jti")
+        session_id = payload.get("session_id")
 
-        if username is None or jti is None:
+        if username is None or session_id is None:
             raise HTTPException(status_code=401, detail="Token inválido")
+
+        # Verificar sesión en DB
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT revoked, expires_at
+                    FROM core.user_session
+                    WHERE session_id = %s
+                """, (session_id,))
+                session = cur.fetchone()
+
+        if not session:
+            raise HTTPException(status_code=401, detail="Sesión no válida")
+
+        revoked, expires_at = session
+
+        if revoked:
+            raise HTTPException(status_code=401, detail="Sesión revocada")
+
+        if expires_at < datetime.utcnow():
+            raise HTTPException(status_code=401, detail="Sesión expirada")
 
         return {
             "username": username,
             "group_id": group_id,
-            "jti": jti
+            "session_id": session_id
         }
 
     except JWTError:
@@ -202,11 +223,14 @@ def login_username(data: dict = Body(...)):
 
 @app.post("/login")
 def login(data: dict = Body(...)):
+
     username = data.get("username")
     password = data.get("password")
 
     if not username or not password:
         raise HTTPException(status_code=400, detail="Usuario y clave requeridos")
+
+    username = username.strip().lower()
 
     query = """
     SELECT user_password_hash, user_group_id
@@ -231,16 +255,29 @@ def login(data: dict = Body(...)):
     if hashed_input != stored_password:
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
+    # Crear sesión
+    session_id = str(uuid4())
+    expires_at = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO core.user_session
+                (session_id, user_name, user_group_id, expires_at)
+                VALUES (%s, %s, %s, %s)
+            """, (session_id, username, group_id, expires_at))
+
+    # Crear JWT con session_id
     access_token = create_access_token({
         "sub": username,
-        "group_id": group_id
+        "group_id": group_id,
+        "session_id": session_id
     })
 
     return {
         "access_token": access_token,
         "token_type": "bearer"
     }
-
 @app.get("/familias")
 def obtener_familias(current_user: str = Depends(verify_token)):
     query = """

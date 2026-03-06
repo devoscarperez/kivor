@@ -222,7 +222,7 @@ def login_username(data: dict = Body(...)):
 
 
 @app.post("/login")
-def login(data: dict = Body(...)):
+def login(request: Request, data: dict = Body(...)):
 
     username = data.get("username")
     password = data.get("password")
@@ -255,17 +255,19 @@ def login(data: dict = Body(...)):
     if hashed_input != stored_password:
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
+    client_ip = request.client.host
+    
     # Crear sesión
     session_id = str(uuid4())
     expires_at = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO core.user_session
-                (session_id, user_name, user_group_id, expires_at)
-                VALUES (%s, %s, %s, %s)
-            """, (session_id, username, group_id, expires_at))
+        cur.execute("""
+            INSERT INTO core.user_session
+            (session_id, user_name, user_group_id, expires_at, ip_address)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (session_id, username, group_id, expires_at, client_ip))
 
     # Crear JWT con session_id
     access_token = create_access_token({

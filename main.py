@@ -266,9 +266,9 @@ def login(request: Request, data: dict = Body(...)):
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO core.user_session
-                (session_id, user_name, user_group_id, expires_at, ip_address)
-                VALUES (%s, %s, %s, %s, %s)
-                """, (session_id, username, group_id, expires_at, client_ip))
+                (session_id, user_name, user_group_id, expires_at, ip_address, user_agent)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                """, (session_id, username, group_id, expires_at, client_ip, user_agent))
 
     # Crear JWT con session_id
     access_token = create_access_token({

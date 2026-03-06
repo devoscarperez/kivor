@@ -256,6 +256,7 @@ def login(request: Request, data: dict = Body(...)):
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
     client_ip = request.client.host
+    user_agent = request.headers.get("user-agent")
 
     # Crear sesión
     session_id = str(uuid4())
@@ -267,7 +268,7 @@ def login(request: Request, data: dict = Body(...)):
                 INSERT INTO core.user_session
                 (session_id, user_name, user_group_id, expires_at, ip_address)
                 VALUES (%s, %s, %s, %s, %s)
-            """, (session_id, username, group_id, expires_at, client_ip))
+                """, (session_id, username, group_id, expires_at, client_ip))
 
     # Crear JWT con session_id
     access_token = create_access_token({

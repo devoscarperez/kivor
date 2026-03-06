@@ -478,3 +478,25 @@ def logout(current_user: dict = Depends(verify_token)):
             """, (session_id,))
 
     return {"status": "ok"}
+
+@app.get("/sessions")
+def get_sessions(current_user: dict = Depends(verify_token)):
+
+    username = current_user.get("username")
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT session_id,
+                       created_at,
+                       expires_at,
+                       revoked
+                FROM core.user_session
+                WHERE user_name = %s
+                ORDER BY created_at DESC
+            """, (username,))
+
+            columns = [desc[0] for desc in cur.description]
+            rows = cur.fetchall()
+
+    return [dict(zip(columns, row)) for row in rows]

@@ -490,17 +490,17 @@ def get_sessions(current_user: dict = Depends(verify_token)):
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-         cur.execute("""
-            SELECT session_id,
-                   created_at,
-                   expires_at,
-                   revoked
-            FROM core.user_session
-            WHERE user_name = %s
-            AND revoked = FALSE
-            AND expires_at > NOW()
-            ORDER BY created_at DESC
-        """, (username,))
+            cur.execute("""
+                SELECT session_id,
+                       created_at,
+                       expires_at,
+                       revoked
+                FROM core.user_session
+                WHERE user_name = %s
+                AND revoked = FALSE
+                AND expires_at > NOW()
+                ORDER BY created_at DESC
+            """, (username,))
 
             columns = [desc[0] for desc in cur.description]
             rows = cur.fetchall()

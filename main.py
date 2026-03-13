@@ -507,3 +507,47 @@ def get_sessions(current_user: dict = Depends(verify_token)):
             rows = cur.fetchall()
 
     return [dict(zip(columns, row)) for row in rows]
+
+
+
+@app.post("/customers-express/generate")
+def generate_customer_express(current_user: dict = Depends(verify_token)):
+
+    try:
+
+        token = uuid4().hex
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+
+                cur.execute("""
+                    INSERT INTO lindasylunaticas.customers_express
+                    (
+                        customers_express_token,
+                        customers_express_token_created_at,
+                        customers_express_token_expires_at,
+                        customers_express_link_status
+                    )
+                    VALUES
+                    (
+                        %s,
+                        NOW(),
+                        NOW() + interval '24 hours',
+                        'created'
+                    )
+                    RETURNING customers_express_id;
+                """, (token,))
+
+                result = cur.fetchone()
+
+        link = f"https://kivor.app/cx/{token}"
+
+        return {
+            "status": "ok",
+            "customers_express_id": result[0],
+            "token": token,
+            "link": link
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

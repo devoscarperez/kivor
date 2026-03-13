@@ -122,15 +122,7 @@ def get_connection():
         raise Exception("DATABASE_URL no está configurada")
     return psycopg.connect(database_url)
     
-
-# def require_admin(username: str):
-    
-def get_connection():
-    database_url = os.getenv("DATABASE_URL")
-    if not database_url:
-        raise Exception("DATABASE_URL no está configurada")
-    return psycopg.connect(database_url)
-
+# Valida RUT
 def validar_rut(rut: str) -> bool:
     try:
         rut = rut.replace(".", "").replace("-", "").upper().strip()
@@ -723,11 +715,14 @@ def save_customer_express(token: str, data: dict = Body(...)):
                 identifier = data.get("identifier")
                 
                 if identifier_type == "RUT" and identifier:
+                    identifier = identifier.replace(".", "").upper()
+                    data["identifier"] = identifier
                    if not validar_rut(identifier):
                       raise HTTPException(
                             status_code=400,
                             detail="invalid_rut"
                    )
+                   
 
                 
                 # Construir update dinámico
@@ -765,8 +760,12 @@ def save_customer_express(token: str, data: dict = Body(...)):
 
                 cur.execute(query, tuple(params))
 
+
         return {
-            "status": "ok"
+            "status": "ok",
+            "token": token,
+            "fields": fields,
+            "expires_at": expires_at
         }
 
     except HTTPException:

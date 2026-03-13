@@ -551,3 +551,72 @@ def generate_customer_express(current_user: dict = Depends(verify_token)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/customers-express/{token}")
+def get_customer_express(token: str):
+
+    try:
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+
+                # Validar token
+                cur.execute("""
+                    SELECT
+                        customers_express_id,
+                        customers_express_token_expires_at,
+                        customers_express_link_status
+                    FROM lindasylunaticas.customers_express
+                    WHERE customers_express_token = %s
+                """, (token,))
+
+                record = cur.fetchone()
+
+                if not record:
+                    raise HTTPException(status_code=404, detail="invalid_link")
+
+                customers_express_id, expires_at, status = record
+
+                if expires_at and expires_at < datetime.utcnow():
+                    raise HTTPException(status_code=400, detail="expired_link")
+
+                if status == "completed":
+                    raise HTTPException(status_code=400, detail="form_completed")
+
+                # Registrar apertura si aún no se ha abierto
+                cur.execute("""
+                    UPDATE lindasylunaticas.customers_express
+                    SET
+                        customers_express_token_opened_at = NOW(),
+                        customers_express_link_status = 'opened'
+                    WHERE customers_express_token = %s
+                    AND customers_express_link_status = 'created'
+                """, (token,))
+
+                # Obtener configuración de campos
+                cur.execute("""
+                    SELECT
+                        customer_capture_settings_field,
+                        customer_capture_settings_is_required,
+                        customer_capture_settings_display_order
+                    FROM lindasylunaticas.customer_capture_settings
+                    WHERE customer_capture_settings_is_active = TRUE
+                    ORDER BY customer_capture_settings_display_order
+                """)
+
+                columns = [desc[0] for desc in cur.description]
+                rows = cur.fetchall()
+
+        fields = [dict(zip(columns, row)) for row in rows]
+
+        return {
+            "status": "ok",
+            "token": token,
+            "fields": fields
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

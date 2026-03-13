@@ -620,3 +620,111 @@ def get_customer_express(token: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/customers-express/{token}")
+def save_customer_express(token: str, data: dict = Body(...)):
+
+    try:
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+
+                # Validar token
+                cur.execute("""
+                    SELECT
+                        customers_express_id,
+                        customers_express_token_expires_at,
+                        customers_express_link_status
+                    FROM lindasylunaticas.customers_express
+                    WHERE customers_express_token = %s
+                """, (token,))
+
+                record = cur.fetchone()
+
+                if not record:
+                    raise HTTPException(status_code=404, detail="invalid_link")
+
+                customers_express_id, expires_at, status = record
+
+                if expires_at and expires_at < datetime.utcnow():
+                    raise HTTPException(status_code=400, detail="expired_link")
+
+                if status == "completed":
+                    raise HTTPException(status_code=400, detail="form_completed")
+
+                # Obtener configuración de campos
+                cur.execute("""
+                    SELECT
+                        customer_capture_settings_field,
+                        customer_capture_settings_is_required
+                    FROM lindasylunaticas.customer_capture_settings
+                    WHERE customer_capture_settings_is_active = TRUE
+                """)
+
+                settings = cur.fetchall()
+
+                required_fields = [
+                    r[0] for r in settings if r[1] is True
+                ]
+
+                # Validar campos obligatorios
+                for field in required_fields:
+                    if not data.get(field):
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"missing_field:{field}"
+                        )
+
+                # Validación básica email
+                email = data.get("email")
+                if email and "@" not in email:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="invalid_email"
+                    )
+
+                # Construir update dinámico
+                allowed_fields = [
+                    "first_name",
+                    "last_name",
+                    "nickname",
+                    "mobile",
+                    "identifier_type",
+                    "identifier",
+                    "email",
+                    "birth_date"
+                ]
+
+                update_fields = []
+                params = []
+
+                for field in allowed_fields:
+                    if field in data:
+                        column = f"customers_express_{field}"
+                        update_fields.append(f"{column} = %s")
+                        params.append(data[field])
+
+                # completar update
+                update_fields.append("customers_express_completed_at = NOW()")
+                update_fields.append("customers_express_link_status = 'completed'")
+
+                params.append(token)
+
+                query = f"""
+                    UPDATE lindasylunaticas.customers_express
+                    SET {', '.join(update_fields)}
+                    WHERE customers_express_token = %s
+                """
+
+                cur.execute(query, tuple(params))
+
+        return {
+            "status": "ok"
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

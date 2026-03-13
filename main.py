@@ -131,6 +131,40 @@ def get_connection():
         raise Exception("DATABASE_URL no está configurada")
     return psycopg.connect(database_url)
 
+def validar_rut(rut: str) -> bool:
+    try:
+        rut = rut.replace(".", "").replace("-", "").upper().strip()
+
+        cuerpo = rut[:-1]
+        dv = rut[-1]
+
+        if not cuerpo.isdigit():
+            return False
+
+        suma = 0
+        multiplo = 2
+
+        for c in reversed(cuerpo):
+            suma += int(c) * multiplo
+            multiplo += 1
+            if multiplo == 8:
+                multiplo = 2
+
+        resto = suma % 11
+        dv_calculado = 11 - resto
+
+        if dv_calculado == 11:
+            dv_calculado = "0"
+        elif dv_calculado == 10:
+            dv_calculado = "K"
+        else:
+            dv_calculado = str(dv_calculado)
+
+        return dv == dv_calculado
+
+    except:
+        return False
+
 
 @app.get("/")
 def root():
@@ -684,6 +718,18 @@ def save_customer_express(token: str, data: dict = Body(...)):
                         detail="invalid_email"
                     )
 
+                # VALIDACIÓN RUT AQUÍ
+                identifier_type = data.get("identifier_type")
+                identifier = data.get("identifier")
+                
+                if identifier_type == "RUT" and identifier:
+                   if not validar_rut(identifier):
+                      raise HTTPException(
+                            status_code=400,
+                            detail="invalid_rut"
+                   )
+
+                
                 # Construir update dinámico
                 allowed_fields = [
                     "first_name",

@@ -566,7 +566,7 @@ def generate_customer_express(current_user: dict = Depends(verify_token)):
 
                 result = cur.fetchone()
 
-        link = f"https://kivor.app/cx/{token}"
+        link = f"https://kivor-frontend.onrender.com/cx/{token}"
 
         return {
             "status": "ok",

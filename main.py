@@ -713,6 +713,17 @@ def save_customer_express(token: str, data: dict = Body(...)):
                 # VALIDACIÓN RUT AQUÍ
                 identifier_type = data.get("identifier_type")
                 identifier = data.get("identifier")
+
+                birth_date = data.get("birth_date")
+                if birth_date:
+                try:
+                    d, m, y = birth_date.split(" ")
+                    data["birth_date"] = f"{y}-{m}-{d}"
+                except:
+                raise HTTPException(
+                    status_code=400,
+                    detail="invalid_birth_date"
+                    )
                 
                 if identifier_type == "RUT" and identifier:
                     identifier = identifier.replace(".", "").upper()
@@ -741,7 +752,7 @@ def save_customer_express(token: str, data: dict = Body(...)):
                 params = []
 
                 for field in allowed_fields:
-                    if field in data:
+                    if field in data and data[field] != "":
                         column = f"customers_express_{field}"
                         update_fields.append(f"{column} = %s")
                         params.append(data[field])
@@ -764,7 +775,6 @@ def save_customer_express(token: str, data: dict = Body(...)):
         return {
             "status": "ok",
             "token": token,
-            "fields": fields,
             "expires_at": expires_at
         }
 

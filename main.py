@@ -716,14 +716,14 @@ def save_customer_express(token: str, data: dict = Body(...)):
 
                 birth_date = data.get("birth_date")
                 if birth_date:
-                try:
-                    d, m, y = birth_date.split(" ")
-                    data["birth_date"] = f"{y}-{m}-{d}"
-                except:
-                raise HTTPException(
-                    status_code=400,
-                    detail="invalid_birth_date"
-                    )
+                    try:
+                        d, m, y = birth_date.split(" ")
+                        data["birth_date"] = f"{y}-{m}-{d}"
+                    except:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="invalid_birth_date"
+                        )
                 
                 if identifier_type == "RUT" and identifier:
                     identifier = identifier.replace(".", "").upper()

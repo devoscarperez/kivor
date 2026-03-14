@@ -717,11 +717,11 @@ def save_customer_express(token: str, data: dict = Body(...)):
                 if identifier_type == "RUT" and identifier:
                     identifier = identifier.replace(".", "").upper()
                     data["identifier"] = identifier
-                   if not validar_rut(identifier):
-                      raise HTTPException(
-                            status_code=400,
-                            detail="invalid_rut"
-                   )
+                    if not validar_rut(identifier):
+                        raise HTTPException(
+                        status_code=400,
+                        detail="invalid_rut"
+                        )
                    
 
                 

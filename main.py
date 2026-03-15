@@ -349,3 +349,9 @@ def get_customer_express(token: str):
         "fields": fields,
         "identifier_types": identifier_types
     }
+
+@app.get("/config")
+def get_config():
+    return {
+        "api_base": os.getenv("API_BASE")
+    }

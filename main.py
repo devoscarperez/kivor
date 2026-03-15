@@ -46,7 +46,12 @@ def get_connection():
     if not database_url:
         raise Exception("DATABASE_URL no está configurada")
     return psycopg.connect(database_url)
+    
+def set_tenant_schema(conn, tenant_schema):
 
+    with conn.cursor() as cur:
+        cur.execute(f"SET search_path TO {tenant_schema}")
+        
 # =========================
 # JWT
 # =========================
@@ -79,9 +84,17 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
 
         username = payload.get("sub")
+        tenant_schema = payload.get("tenant_schema")
         group_id = payload.get("group_id")
         session_id = payload.get("session_id")
+        person_id = payload.get("person_id")
+        organization_id = payload.get("organization_id")
 
+        if not tenant_schema:
+            raise HTTPException(
+            status_code=401,
+            detail="Token inválido: tenant no definido"
+        )
         if username is None or session_id is None:
             raise HTTPException(status_code=401, detail="Token inválido")
 
@@ -115,6 +128,45 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido")
+
+def get_current_token_data(token: str):
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+
+        username = payload.get("sub")
+        tenant_schema = payload.get("tenant_schema")
+        group_id = payload.get("group_id")
+        session_id = payload.get("session_id")
+        person_id = payload.get("person_id")
+        organization_id = payload.get("organization_id")
+
+        if not username:
+            raise HTTPException(
+                status_code=401,
+                detail="Token inválido: usuario no definido"
+            )
+
+        if not tenant_schema:
+            raise HTTPException(
+                status_code=401,
+                detail="Token inválido: tenant no definido"
+            )
+
+        return {
+            "username": username,
+            "tenant_schema": tenant_schema,
+            "group_id": group_id,
+            "session_id": session_id,
+            "person_id": person_id,
+            "organization_id": organization_id
+        }
+
+    except JWTError:
+        raise HTTPException(
+            status_code=401,
+            detail="Token inválido"
+        )
 
 # =========================
 # VALIDACIONES

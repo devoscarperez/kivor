@@ -583,38 +583,44 @@ def search_customers_express(mobile: str, current_user: dict = Depends(verify_to
 
     try:
 
-        query = """
-        SELECT
-            customers_express_completed_at,
-            customers_express_first_name,
-            customers_express_last_name,
-            customers_express_identifier_type_code,
-            customers_express_identifier_value,
-            customers_express_email,
-            customers_express_mobile
-        FROM lindasylunaticas.customers_express
-        WHERE customers_express_mobile = %s
-        AND customers_express_completed_at IS NOT NULL
-        ORDER BY customers_express_completed_at DESC;
-        """
-
         with get_connection() as conn:
             with conn.cursor() as cur:
 
-                cur.execute(query, (mobile,))
+                # Obtener campos configurados en el formulario
+                cur.execute("""
+                    SELECT
+                        customer_capture_settings_field
+                    FROM lindasylunaticas.customer_capture_settings
+                    WHERE customer_capture_settings_is_active = TRUE
+                    ORDER BY customer_capture_settings_display_order
+                """)
+
+                field_rows = cur.fetchall()
+                fields = [r[0] for r in field_rows]
+
+                # Buscar registros del cliente
+                cur.execute("""
+                    SELECT *
+                    FROM lindasylunaticas.customers_express
+                    WHERE customers_express_mobile = %s
+                    AND customers_express_completed_at IS NOT NULL
+                    ORDER BY customers_express_completed_at DESC
+                """, (mobile,))
 
                 columns = [desc[0] for desc in cur.description]
                 rows = cur.fetchall()
 
-        result = [dict(zip(columns, row)) for row in rows]
+        results = [dict(zip(columns, row)) for row in rows]
 
         return {
             "status": "ok",
-            "results": result
+            "fields": fields,
+            "results": results
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @app.get("/customers-express/{token}")

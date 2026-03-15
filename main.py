@@ -123,6 +123,14 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         return {
             "username": username,
             "group_id": group_id,
+            "session_id": session_id,
+            "tenant_schema": tenant_schema,
+            "organization_id": organization_id,
+            "person_id": person_id
+        }
+        return {
+            "username": username,
+            "group_id": group_id,
             "session_id": session_id
         }
 
@@ -373,10 +381,11 @@ def generate_customer_express(current_user: dict = Depends(verify_token)):
     token = uuid4().hex
 
     with get_connection() as conn:
+        set_tenant_schema(conn, current_user["tenant_schema"])
         with conn.cursor() as cur:
 
             cur.execute("""
-                INSERT INTO lindasylunaticas.customers_express
+                INSERT INTO customers_express
                 (
                     customers_express_token,
                     customers_express_token_created_at,
@@ -500,7 +509,7 @@ def ganancias_por_mes(mes: str, current_user: str = Depends(verify_token)):
         FLOOR(SUM(CASE WHEN v.family='CEJAS_Y_PESTAÑAS' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS cejas_y_pestanas,
         FLOOR(SUM(CASE WHEN v.family='FACIALES' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS faciales,
         FLOOR(SUM(CASE WHEN v.family='CORPORAL' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS corporal
-    FROM lindasylunaticas.sales v
+    FROM sales v
     WHERE TO_CHAR(v.date,'MM') = %s
     AND v.family IN ('CABELLO','MANOS_Y_PIES','DEPILACION','CEJAS_Y_PESTAÑAS','FACIALES','CORPORAL')
     GROUP BY TO_CHAR(v.date,'YYYYMM')

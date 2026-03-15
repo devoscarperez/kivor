@@ -679,12 +679,36 @@ def get_customer_express(token: str):
                 rows = cur.fetchall()
 
         fields = [dict(zip(columns, row)) for row in rows]
+        identifier_types = []
+
+        # Verificar si el formulario usa identifier_type
+        if any(f["customer_capture_settings_field"] == "identifier_type" for f in fields):
+            with get_connection() as conn:
+                with conn.cursor() as cur:
+
+                cur.execute("""
+                SELECT
+                    identifier_type_settings_code,
+                    identifier_type_settings_label
+                FROM lindasylunaticas.identifier_type_settings
+                WHERE identifier_type_settings_is_active = TRUE
+                ORDER BY identifier_type_settings_display_order
+                """)
+
+                columns = [desc[0] for desc in cur.description]
+                rows = cur.fetchall()
+
+        identifier_types = [dict(zip(columns, row)) for row in rows]
+
+
 
         return {
             "status": "ok",
             "token": token,
-            "fields": fields
+            "fields": fields,
+            "identifier_types": identifier_types
         }
+
 
     except HTTPException:
         raise
@@ -754,10 +778,10 @@ def save_customer_express(token: str, data: dict = Body(...)):
                         detail="invalid_email"
                     )
 
-                # VALIDACIÓN RUT AQUÍ
+                # VALIDACIÓN RUT AQUÍ NUEVA
                 identifier_type = data.get("identifier_type")
                 identifier = data.get("identifier")
-
+                
                 birth_date = data.get("birth_date")
                 if birth_date:
                     try:
@@ -769,16 +793,54 @@ def save_customer_express(token: str, data: dict = Body(...)):
                             detail="invalid_birth_date"
                         )
                 
-                if identifier_type == "RUT" and identifier:
-                    identifier = identifier.replace(".", "").upper()
-                    data["identifier"] = identifier
-                    if not validar_rut(identifier):
-                        raise HTTPException(
-                        status_code=400,
-                        detail="invalid_rut"
-                        )
+                # Validación dinámica del identificador
+                if identifier_type and identifier:
+                
+                    with get_connection() as conn:
+                        with conn.cursor() as cur:
+                
+                            cur.execute("""
+                                SELECT
+                                    identifier_type_settings_validation
+                                FROM lindasylunaticas.identifier_type_settings
+                                WHERE identifier_type_settings_code = %s
+                                AND identifier_type_settings_is_active = TRUE
+                            """, (identifier_type,))
+                
+                            result = cur.fetchone()
+                
+                    if result:
+                        validation = result[0]
+                        
+                        # Validación RUT
+                        if validation == "rut_mod11":
+                
+                            identifier = identifier.replace(".", "").upper()
+                            data["identifier"] = identifier
+                
+                            if not validar_rut(identifier):
+                                raise HTTPException(
+                                    status_code=400,
+                                    detail="invalid_identifier"
+                                )
+                        # Validación numérica
+                        elif validation == "numeric":
+                
+                            if not identifier.isdigit():
+                                raise HTTPException(
+                                    status_code=400,
+                                    detail="invalid_identifier"
+                                )
+                
+                        # Validación celular
+                        elif validation == "phone":
+                
+                            if not identifier.replace("+", "").isdigit():
+                                raise HTTPException(
+                                    status_code=400,
+                                    detail="invalid_identifier"
+                                )
                    
-
                 
                 # Construir update dinámico
                 allowed_fields = [

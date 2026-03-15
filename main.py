@@ -1,9 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import auth
-from routers import customers_express
-from routers import dashboard
+from routers.auth import router as auth_router
+from routers.customers_express import router as customers_express_router
+from routers.dashboard import router as dashboard_router
 
 app = FastAPI(title="KIVOR Backend")
 
@@ -15,9 +15,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router)
-app.include_router(customers_express.router)
-app.include_router(dashboard.router)
+app.include_router(auth_router)
+app.include_router(customers_express_router)
+app.include_router(dashboard_router)
 
 
 @app.get("/")

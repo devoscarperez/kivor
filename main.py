@@ -187,16 +187,15 @@ def login(request: Request, data: dict = Body(...)):
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-
             cur.execute("""
-                SELECT user_password_hash, user_group_id
+                SELECT user_id, user_password_hash, user_group_id
                 FROM core."user"
                 WHERE user_name = %s
                 AND user_active = TRUE
             """, (username,))
 
             user = cur.fetchone()
-
+        
     if not user:
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 

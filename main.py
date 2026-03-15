@@ -829,3 +829,33 @@ def save_customer_express(token: str, data: dict = Body(...)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/identifier-types")
+def get_identifier_types():
+
+    try:
+
+        query = """
+        SELECT
+            identifier_type_settings_code,
+            identifier_type_settings_label
+        FROM lindasylunaticas.identifier_type_settings
+        WHERE identifier_type_settings_is_active = TRUE
+        ORDER BY identifier_type_settings_display_order
+        """
+
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query)
+                columns = [desc[0] for desc in cur.description]
+                rows = cur.fetchall()
+
+        result = [dict(zip(columns, row)) for row in rows]
+
+        return {
+            "status": "ok",
+            "identifier_types": result
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+

@@ -299,7 +299,11 @@ def login(request: Request, data: dict = Body(...)):
     access_token = create_access_token({
         "sub": username,
         "group_id": group_id,
-        "session_id": session_id
+        "session_id": session_id,
+        "tenant_id": tenant_id,
+        "tenant_schema": tenant_schema,
+        "organization_id": organization_id,
+        "person_id": person_id
     })
 
     return {

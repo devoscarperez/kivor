@@ -231,6 +231,46 @@ def login(request: Request, data: dict = Body(...)):
         )
 
     organization_id = org[0]
+    cur.execute("""
+    WITH RECURSIVE org_tree AS (
+
+        SELECT
+            organization_id,
+            organization_parent_id,
+            organization_tenant_id
+        FROM core.organization
+        WHERE organization_id = %s
+
+        UNION ALL
+
+        SELECT
+            o.organization_id,
+            o.organization_parent_id,
+            o.organization_tenant_id
+        FROM core.organization o
+        JOIN org_tree t
+            ON o.organization_id = t.organization_parent_id
+    )
+
+    SELECT
+        t.tenant_id,
+        t.tenant_db_schema
+    FROM org_tree ot
+    JOIN core.tenant t
+        ON t.tenant_id = ot.organization_tenant_id
+    WHERE ot.organization_tenant_id IS NOT NULL
+    LIMIT 1
+    """, (organization_id,))
+
+    tenant = cur.fetchone()
+
+    if not tenant:
+        raise HTTPException(
+            status_code=403,
+            detail="No se pudo resolver el tenant del usuario"
+        )
+    tenant_id = tenant[0]
+    tenant_schema = tenant[1]
 
     user_id = user[0]
     stored_password = user[1]

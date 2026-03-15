@@ -199,8 +199,25 @@ def login(request: Request, data: dict = Body(...)):
     if not user:
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-    stored_password = user[0]
-    group_id = user[1]
+    cur.execute("""
+    SELECT person_id
+    FROM core.person
+    WHERE person_user_id = %s
+    """, (user_id,))
+
+    person = cur.fetchone()
+
+    if not person:
+        raise HTTPException(
+            status_code=403,
+            detail="Usuario no tiene persona asociada"
+        )
+
+    person_id = person[0]
+
+    user_id = user[0]
+    stored_password = user[1]
+    group_id = user[2]
 
     hashed_input = hashlib.sha256(password.encode()).hexdigest()
 

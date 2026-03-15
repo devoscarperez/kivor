@@ -46,12 +46,11 @@ def get_connection():
     if not database_url:
         raise Exception("DATABASE_URL no está configurada")
     return psycopg.connect(database_url)
-    
-def set_tenant_schema(conn, tenant_schema):
 
+def set_tenant_schema(conn, tenant_schema):
     with conn.cursor() as cur:
-        cur.execute(f"SET search_path TO {tenant_schema}")
-        
+        cur.execute(f"SET search_path TO {tenant_schema}, public")
+
 # =========================
 # JWT
 # =========================
@@ -92,9 +91,10 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
         if not tenant_schema:
             raise HTTPException(
-            status_code=401,
-            detail="Token inválido: tenant no definido"
-        )
+                status_code=401,
+                detail="Token inválido: tenant no definido"
+            )
+
         if username is None or session_id is None:
             raise HTTPException(status_code=401, detail="Token inválido")
 
@@ -128,95 +128,9 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
             "organization_id": organization_id,
             "person_id": person_id
         }
-        return {
-            "username": username,
-            "group_id": group_id,
-            "session_id": session_id
-        }
 
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido")
-
-def get_current_token_data(token: str):
-
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-
-        username = payload.get("sub")
-        tenant_schema = payload.get("tenant_schema")
-        group_id = payload.get("group_id")
-        session_id = payload.get("session_id")
-        person_id = payload.get("person_id")
-        organization_id = payload.get("organization_id")
-
-        if not username:
-            raise HTTPException(
-                status_code=401,
-                detail="Token inválido: usuario no definido"
-            )
-
-        if not tenant_schema:
-            raise HTTPException(
-                status_code=401,
-                detail="Token inválido: tenant no definido"
-            )
-
-        return {
-            "username": username,
-            "tenant_schema": tenant_schema,
-            "group_id": group_id,
-            "session_id": session_id,
-            "person_id": person_id,
-            "organization_id": organization_id
-        }
-
-    except JWTError:
-        raise HTTPException(
-            status_code=401,
-            detail="Token inválido"
-        )
-
-# =========================
-# VALIDACIONES
-# =========================
-
-def validar_rut(rut: str) -> bool:
-
-    try:
-
-        rut = rut.replace(".", "").replace("-", "").upper().strip()
-
-        cuerpo = rut[:-1]
-        dv = rut[-1]
-
-        if not cuerpo.isdigit():
-            return False
-
-        suma = 0
-        multiplo = 2
-
-        for c in reversed(cuerpo):
-
-            suma += int(c) * multiplo
-            multiplo += 1
-
-            if multiplo == 8:
-                multiplo = 2
-
-        resto = suma % 11
-        dv_calculado = 11 - resto
-
-        if dv_calculado == 11:
-            dv_calculado = "0"
-        elif dv_calculado == 10:
-            dv_calculado = "K"
-        else:
-            dv_calculado = str(dv_calculado)
-
-        return dv == dv_calculado
-
-    except:
-        return False
 
 # =========================
 # ROOT
@@ -247,6 +161,7 @@ def login(request: Request, data: dict = Body(...)):
 
     with get_connection() as conn:
         with conn.cursor() as cur:
+
             cur.execute("""
                 SELECT user_id, user_password_hash, user_group_id
                 FROM core."user"
@@ -255,86 +170,71 @@ def login(request: Request, data: dict = Body(...)):
             """, (username,))
 
             user = cur.fetchone()
-        
-    if not user:
-        raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-    cur.execute("""
-    SELECT person_id
-    FROM core.person
-    WHERE person_user_id = %s
-    """, (user_id,))
+            if not user:
+                raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-    person = cur.fetchone()
+            user_id = user[0]
+            stored_password = user[1]
+            group_id = user[2]
 
-    if not person:
-        raise HTTPException(
-            status_code=403,
-            detail="Usuario no tiene persona asociada"
-        )
+            cur.execute("""
+                SELECT person_id
+                FROM core.person
+                WHERE person_user_id = %s
+            """, (user_id,))
 
-    person_id = person[0]
-    cur.execute("""
-    SELECT person_organization_organization_id
-    FROM core.person_organization
-    WHERE person_organization_person_id = %s
-    AND person_organization_is_default = true
-    AND person_organization_active = true
-    """, (person_id,))
+            person = cur.fetchone()
 
-    org = cur.fetchone()
+            if not person:
+                raise HTTPException(status_code=403, detail="Usuario sin persona asociada")
 
-    if not org:
-        raise HTTPException(
-            status_code=403,
-            detail="Usuario no tiene organización asignada"
-        )
+            person_id = person[0]
 
-    organization_id = org[0]
-    cur.execute("""
-    WITH RECURSIVE org_tree AS (
+            cur.execute("""
+                SELECT person_organization_organization_id
+                FROM core.person_organization
+                WHERE person_organization_person_id = %s
+                AND person_organization_is_default = true
+                AND person_organization_active = true
+            """, (person_id,))
 
-        SELECT
-            organization_id,
-            organization_parent_id,
-            organization_tenant_id
-        FROM core.organization
-        WHERE organization_id = %s
+            org = cur.fetchone()
 
-        UNION ALL
+            if not org:
+                raise HTTPException(status_code=403, detail="Usuario sin organización")
 
-        SELECT
-            o.organization_id,
-            o.organization_parent_id,
-            o.organization_tenant_id
-        FROM core.organization o
-        JOIN org_tree t
-            ON o.organization_id = t.organization_parent_id
-    )
+            organization_id = org[0]
 
-    SELECT
-        t.tenant_id,
-        t.tenant_db_schema
-    FROM org_tree ot
-    JOIN core.tenant t
-        ON t.tenant_id = ot.organization_tenant_id
-    WHERE ot.organization_tenant_id IS NOT NULL
-    LIMIT 1
-    """, (organization_id,))
+            cur.execute("""
+            WITH RECURSIVE org_tree AS (
+                SELECT organization_id, organization_parent_id, organization_tenant_id
+                FROM core.organization
+                WHERE organization_id = %s
 
-    tenant = cur.fetchone()
+                UNION ALL
 
-    if not tenant:
-        raise HTTPException(
-            status_code=403,
-            detail="No se pudo resolver el tenant del usuario"
-        )
-    tenant_id = tenant[0]
-    tenant_schema = tenant[1]
+                SELECT o.organization_id, o.organization_parent_id, o.organization_tenant_id
+                FROM core.organization o
+                JOIN org_tree t
+                ON o.organization_id = t.organization_parent_id
+            )
 
-    user_id = user[0]
-    stored_password = user[1]
-    group_id = user[2]
+            SELECT t.tenant_id, t.tenant_db_schema
+            FROM org_tree ot
+            JOIN core.tenant t
+            ON t.tenant_id = ot.organization_tenant_id
+            WHERE ot.organization_tenant_id IS NOT NULL
+            LIMIT 1
+            """, (organization_id,))
+
+            tenant = cur.fetchone()
+
+            if not tenant:
+                raise HTTPException(status_code=403, detail="No se pudo resolver tenant")
+
+            tenant_id = tenant[0]
+            tenant_schema = tenant[1]
 
     hashed_input = hashlib.sha256(password.encode()).hexdigest()
 
@@ -381,7 +281,9 @@ def generate_customer_express(current_user: dict = Depends(verify_token)):
     token = uuid4().hex
 
     with get_connection() as conn:
+
         set_tenant_schema(conn, current_user["tenant_schema"])
+
         with conn.cursor() as cur:
 
             cur.execute("""
@@ -487,14 +389,23 @@ def get_customer_express(token: str, current_user: dict = Depends(verify_token))
         "fields": fields,
         "identifier_types": identifier_types
     }
+
+# =========================
+# CONFIG
+# =========================
+
 @app.get("/config")
 def get_config():
     return {
         "api_base": os.getenv("API_BASE")
     }
 
+# =========================
+# GANANCIAS
+# =========================
+
 @app.get("/ganancias-por-mes")
-def ganancias_por_mes(mes: str, current_user: str = Depends(verify_token)):
+def ganancias_por_mes(mes: str, current_user: dict = Depends(verify_token)):
 
     if not mes.isdigit() or len(mes) != 2 or int(mes) < 1 or int(mes) > 12:
         raise HTTPException(status_code=400, detail="Mes inválido. Usa formato 01-12.")
@@ -515,21 +426,19 @@ def ganancias_por_mes(mes: str, current_user: str = Depends(verify_token)):
     ORDER BY fecha;
     """
 
-    try:
-        with get_connection() as conn:
-            set_tenant_schema(conn, current_user["tenant_schema"])
-            with conn.cursor() as cur:
-                cur.execute(query, (mes,))
-                columns = [desc[0] for desc in cur.description]
-                rows = cur.fetchall()
+    with get_connection() as conn:
 
-        result = [dict(zip(columns, row)) for row in rows]
+        set_tenant_schema(conn, current_user["tenant_schema"])
 
-        return {
-            "mes": mes,
-            "data": result
-        }
+        with conn.cursor() as cur:
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+            cur.execute(query, (mes,))
+            columns = [desc[0] for desc in cur.description]
+            rows = cur.fetchall()
 
+    result = [dict(zip(columns, row)) for row in rows]
+
+    return {
+        "mes": mes,
+        "data": result
+    }

@@ -627,7 +627,6 @@ def search_customers_express(mobile: str, current_user: dict = Depends(verify_to
 def get_customer_express(token: str):
 
     try:
-
         with get_connection() as conn:
             with conn.cursor() as cur:
 
@@ -685,18 +684,17 @@ def get_customer_express(token: str):
         if any(f["customer_capture_settings_field"] == "identifier_type" for f in fields):
             with get_connection() as conn:
                 with conn.cursor() as cur:
-
-                cur.execute("""
-                SELECT
+                    cur.execute("""
+                    SELECT
                     identifier_type_settings_code,
                     identifier_type_settings_label
-                FROM lindasylunaticas.identifier_type_settings
-                WHERE identifier_type_settings_is_active = TRUE
-                ORDER BY identifier_type_settings_display_order
-                """)
+                    FROM lindasylunaticas.identifier_type_settings
+                    WHERE identifier_type_settings_is_active = TRUE
+                    ORDER BY identifier_type_settings_display_order
+                    """)
 
-                columns = [desc[0] for desc in cur.description]
-                rows = cur.fetchall()
+                   columns = [desc[0] for desc in cur.description]
+                   rows = cur.fetchall()
 
         identifier_types = [dict(zip(columns, row)) for row in rows]
 

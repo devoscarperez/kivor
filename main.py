@@ -47,9 +47,11 @@ def get_connection():
         raise Exception("DATABASE_URL no está configurada")
     return psycopg.connect(database_url)
 
+
 def set_tenant_schema(conn, tenant_schema):
     with conn.cursor() as cur:
         cur.execute(f"SET search_path TO {tenant_schema}, public")
+
 
 # =========================
 # JWT
@@ -67,8 +69,7 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
         "jti": str(uuid4())
     })
 
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -90,10 +91,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         organization_id = payload.get("organization_id")
 
         if not tenant_schema:
-            raise HTTPException(
-                status_code=401,
-                detail="Token inválido: tenant no definido"
-            )
+            raise HTTPException(status_code=401, detail="Token inválido: tenant no definido")
 
         if username is None or session_id is None:
             raise HTTPException(status_code=401, detail="Token inválido")
@@ -132,6 +130,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido")
 
+
 # =========================
 # ROOT
 # =========================
@@ -140,9 +139,11 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 def root():
     return {"status": "ok", "service": "kivor-backend"}
 
+
 @app.get("/health")
 def health():
     return {"healthy": True}
+
 
 # =========================
 # LOGIN
@@ -187,7 +188,7 @@ def login(request: Request, data: dict = Body(...)):
             person = cur.fetchone()
 
             if not person:
-                raise HTTPException(status_code=403, detail="Usuario sin persona asociada")
+                raise HTTPException(status_code=403, detail="Usuario no tiene persona asociada")
 
             person_id = person[0]
 
@@ -202,7 +203,7 @@ def login(request: Request, data: dict = Body(...)):
             org = cur.fetchone()
 
             if not org:
-                raise HTTPException(status_code=403, detail="Usuario sin organización")
+                raise HTTPException(status_code=403, detail="Usuario no tiene organización asignada")
 
             organization_id = org[0]
 
@@ -219,7 +220,6 @@ def login(request: Request, data: dict = Body(...)):
                 JOIN org_tree t
                 ON o.organization_id = t.organization_parent_id
             )
-
             SELECT t.tenant_id, t.tenant_db_schema
             FROM org_tree ot
             JOIN core.tenant t
@@ -231,7 +231,7 @@ def login(request: Request, data: dict = Body(...)):
             tenant = cur.fetchone()
 
             if not tenant:
-                raise HTTPException(status_code=403, detail="No se pudo resolver tenant")
+                raise HTTPException(status_code=403, detail="No se pudo resolver el tenant del usuario")
 
             tenant_id = tenant[0]
             tenant_schema = tenant[1]
@@ -270,6 +270,7 @@ def login(request: Request, data: dict = Body(...)):
         "access_token": access_token,
         "token_type": "bearer"
     }
+
 
 # =========================
 # EXPRESS CUSTOMER
@@ -314,6 +315,7 @@ def generate_customer_express(current_user: dict = Depends(verify_token)):
         "token": token,
         "link": link
     }
+
 
 # =========================
 # GET FORM
@@ -390,6 +392,7 @@ def get_customer_express(token: str, current_user: dict = Depends(verify_token))
         "identifier_types": identifier_types
     }
 
+
 # =========================
 # CONFIG
 # =========================
@@ -399,6 +402,7 @@ def get_config():
     return {
         "api_base": os.getenv("API_BASE")
     }
+
 
 # =========================
 # GANANCIAS

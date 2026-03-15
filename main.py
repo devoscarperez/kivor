@@ -214,6 +214,23 @@ def login(request: Request, data: dict = Body(...)):
         )
 
     person_id = person[0]
+    cur.execute("""
+    SELECT person_organization_organization_id
+    FROM core.person_organization
+    WHERE person_organization_person_id = %s
+    AND person_organization_is_default = true
+    AND person_organization_active = true
+    """, (person_id,))
+
+    org = cur.fetchone()
+
+    if not org:
+        raise HTTPException(
+            status_code=403,
+            detail="Usuario no tiene organización asignada"
+        )
+
+    organization_id = org[0]
 
     user_id = user[0]
     stored_password = user[1]

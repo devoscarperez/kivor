@@ -418,9 +418,12 @@ def generate_customer_express(current_user: dict = Depends(verify_token)):
 # =========================
 
 @app.get("/customers-express/{token}")
-def get_customer_express(token: str):
+def get_customer_express(token: str, current_user: dict = Depends(verify_token)):
 
     with get_connection() as conn:
+
+        set_tenant_schema(conn, current_user["tenant_schema"])
+
         with conn.cursor() as cur:
 
             cur.execute("""
@@ -428,7 +431,7 @@ def get_customer_express(token: str):
                     customers_express_id,
                     customers_express_token_expires_at,
                     customers_express_link_status
-                FROM lindasylunaticas.customers_express
+                FROM customers_express
                 WHERE customers_express_token = %s
             """, (token,))
 
@@ -450,7 +453,7 @@ def get_customer_express(token: str):
                     customer_capture_settings_field,
                     customer_capture_settings_is_required,
                     customer_capture_settings_display_order
-                FROM lindasylunaticas.customer_capture_settings
+                FROM customer_capture_settings
                 WHERE customer_capture_settings_is_active = TRUE
                 ORDER BY customer_capture_settings_display_order
             """)
@@ -458,20 +461,17 @@ def get_customer_express(token: str):
             columns = [desc[0] for desc in cur.description]
             rows = cur.fetchall()
 
-    fields = [dict(zip(columns, row)) for row in rows]
+            fields = [dict(zip(columns, row)) for row in rows]
 
-    identifier_types = []
+            identifier_types = []
 
-    if any(f["customer_capture_settings_field"] == "identifier_type" for f in fields):
-
-        with get_connection() as conn:
-            with conn.cursor() as cur:
+            if any(f["customer_capture_settings_field"] == "identifier_type" for f in fields):
 
                 cur.execute("""
                     SELECT
                         identifier_type_settings_code,
                         identifier_type_settings_label
-                    FROM lindasylunaticas.identifier_type_settings
+                    FROM identifier_type_settings
                     WHERE identifier_type_settings_is_active = TRUE
                     ORDER BY identifier_type_settings_display_order
                 """)
@@ -479,7 +479,7 @@ def get_customer_express(token: str):
                 columns = [desc[0] for desc in cur.description]
                 rows = cur.fetchall()
 
-        identifier_types = [dict(zip(columns, row)) for row in rows]
+                identifier_types = [dict(zip(columns, row)) for row in rows]
 
     return {
         "status": "ok",
@@ -487,7 +487,6 @@ def get_customer_express(token: str):
         "fields": fields,
         "identifier_types": identifier_types
     }
-
 @app.get("/config")
 def get_config():
     return {

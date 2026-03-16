@@ -128,11 +128,6 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
             "organization_id": organization_id,
             "person_id": person_id
         }
-        return {
-            "username": username,
-            "group_id": group_id,
-            "session_id": session_id
-        }
 
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido")

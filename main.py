@@ -366,6 +366,36 @@ def login(request: Request, data: dict = Body(...)):
         "token_type": "bearer"
     }
 
+
+@app.post("/login-username")
+def login_username(data: dict = Body(...)):
+
+    username = data.get("username")
+
+    if not username:
+        raise HTTPException(status_code=400, detail="Usuario requerido")
+
+    username = username.strip().lower()
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+
+            cur.execute("""
+                SELECT user_id
+                FROM core."user"
+                WHERE user_name = %s
+                AND user_active = TRUE
+            """, (username,))
+
+            user = cur.fetchone()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    return {
+        "status": "ok"
+    }
+
 # =========================
 # EXPRESS CUSTOMER
 # =========================

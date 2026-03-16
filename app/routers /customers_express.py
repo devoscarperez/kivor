@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from uuid import uuid4
 from datetime import datetime
-from core.db import get_tenant_connection
+from app.core.db import get_tenant_connection
 
 router = APIRouter()
 

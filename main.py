@@ -51,6 +51,18 @@ def set_tenant_schema(conn, tenant_schema):
     with conn.cursor() as cur:
         cur.execute(f"SET search_path TO {tenant_schema}")
 
+
+# =========================
+# CONFIG
+# =========================
+
+@app.get("/config")
+def get_config():
+    return {
+        "api_base": os.getenv("API_BASE")
+    }
+
+
 # =========================
 # JWT
 # =========================

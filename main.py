@@ -43,13 +43,15 @@ security = HTTPBearer()
 
 def get_connection():
     database_url = os.getenv("DATABASE_URL")
+
     if not database_url:
         raise Exception("DATABASE_URL no está configurada")
-    return psycopg.connect(database_url)
 
-def set_tenant_schema(conn, tenant_schema):
-    with conn.cursor() as cur:
-        cur.execute(f"SET search_path TO {tenant_schema}")
+    # psycopg3 no soporta algunos parámetros como options
+    if "options=" in database_url:
+        database_url = database_url.split("&options=")[0]
+
+    return psycopg.connect(database_url)
 
 
 # =========================

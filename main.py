@@ -12,13 +12,6 @@ import os
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from fastapi.responses import Response
 
-
-
-@app.options("/{full_path:path}")
-def options_handler(full_path: str):
-    return Response(status_code=200)
-
-
 # =========================
 # MODELOS
 # =========================
@@ -49,6 +42,12 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 security = HTTPBearer()
 
+
+
+@app.options("/{full_path:path}")
+def options_handler(full_path: str):
+    return Response(status_code=200)
+    
 # =========================
 # DB CONNECTION
 # =========================

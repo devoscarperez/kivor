@@ -333,12 +333,16 @@ def login(request: Request, data: dict = Body(...)):
 # =========================
 # LOGIN USERNAME
 # =========================
-@app.options("/login-username")
-def options_login_username():
-    return {"ok": True}
+# =========================
+# LOGIN USERNAME
+# =========================
 
-@app.post("/login-username")
-def login_username(data: dict = Body(...)):
+@app.api_route("/login-username", methods=["POST", "OPTIONS"])
+def login_username(data: dict = Body(None)):
+
+    # 👉 Manejo preflight (OPTIONS)
+    if data is None:
+        return {"ok": True}
 
     username = data.get("username")
 

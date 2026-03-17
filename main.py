@@ -390,9 +390,6 @@ def login(request: Request, data: dict = Body(...)):
 # =========================
 # LOGIN USERNAME
 # =========================
-# =========================
-# LOGIN USERNAME
-# =========================
 
 @app.api_route("/login-username", methods=["POST", "OPTIONS"])
 def login_username(data: dict = Body(None)):
@@ -807,7 +804,7 @@ def search_customers_express(mobile: str, current_user: dict = Depends(verify_to
                 cur.execute("""
                     SELECT
                         customer_capture_settings_field
-                    FROM lindasylunaticas.customer_capture_settings
+                    FROM customer_capture_settings
                     WHERE customer_capture_settings_is_active = TRUE
                     ORDER BY customer_capture_settings_display_order
                 """)
@@ -818,7 +815,7 @@ def search_customers_express(mobile: str, current_user: dict = Depends(verify_to
                 # Buscar registros del cliente
                 cur.execute("""
                     SELECT *
-                    FROM lindasylunaticas.customers_express
+                    FROM customers_express
                     WHERE customers_express_mobile = %s
                     AND customers_express_completed_at IS NOT NULL
                     ORDER BY customers_express_completed_at DESC

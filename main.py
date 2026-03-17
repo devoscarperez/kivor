@@ -360,3 +360,169 @@ def login_username(data: dict = Body(...)):
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     return {"status": "ok"}
+
+
+# =========================
+# GANANCIAS
+# =========================
+
+@app.get("/ganancias-por-mes")
+def ganancias_por_mes(mes: str, current_user: dict = Depends(verify_token)):
+
+    if not mes.isdigit() or len(mes) != 2 or int(mes) < 1 or int(mes) > 12:
+        raise HTTPException(status_code=400, detail="Mes inválido. Usa formato 01-12.")
+
+    query = """
+    SELECT 
+        TO_CHAR(v.date,'YYYYMM') AS fecha,
+        FLOOR(SUM(CASE WHEN v.family='CABELLO' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS cabello,
+        FLOOR(SUM(CASE WHEN v.family='MANOS_Y_PIES' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS manos_y_pies,
+        FLOOR(SUM(CASE WHEN v.family='DEPILACION' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS depilacion,
+        FLOOR(SUM(CASE WHEN v.family='CEJAS_Y_PESTAÑAS' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS cejas_y_pestanas,
+        FLOOR(SUM(CASE WHEN v.family='FACIALES' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS faciales,
+        FLOOR(SUM(CASE WHEN v.family='CORPORAL' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS corporal
+    FROM sales v
+    WHERE TO_CHAR(v.date,'MM') = %s
+    AND v.family IN ('CABELLO','MANOS_Y_PIES','DEPILACION','CEJAS_Y_PESTAÑAS','FACIALES','CORPORAL')
+    GROUP BY TO_CHAR(v.date,'YYYYMM')
+    ORDER BY fecha;
+    """
+
+    with get_connection() as conn:
+
+        set_tenant_schema(conn, current_user["tenant_schema"])
+
+        with conn.cursor() as cur:
+
+            cur.execute(query, (mes,))
+            columns = [desc[0] for desc in cur.description]
+            rows = cur.fetchall()
+
+    result = [dict(zip(columns, row)) for row in rows]
+
+    return {
+        "mes": mes,
+        "data": result
+    }
+
+
+# =========================
+# EXPRESS CUSTOMER
+# =========================
+
+@app.post("/customers-express/generate")
+def generate_customer_express(current_user: dict = Depends(verify_token)):
+
+    token = uuid4().hex
+
+    with get_connection() as conn:
+
+        set_tenant_schema(conn, current_user["tenant_schema"])
+
+        with conn.cursor() as cur:
+
+            cur.execute("""
+                INSERT INTO customers_express
+                (
+                    customers_express_token,
+                    customers_express_token_created_at,
+                    customers_express_token_expires_at,
+                    customers_express_link_status
+                )
+                VALUES
+                (
+                    %s,
+                    NOW(),
+                    NOW() + interval '24 hours',
+                    'created'
+                )
+                RETURNING customers_express_id
+            """, (token,))
+
+            result = cur.fetchone()
+
+    link = f"https://kivor-frontend.onrender.com/cx.html?token={token}"
+
+    return {
+        "status": "ok",
+        "customers_express_id": result[0],
+        "token": token,
+        "link": link
+    }
+
+
+# ===========================
+# GET FORM CUSTOMERS EXPRESS
+# ===========================
+
+@app.get("/customers-express/{token}")
+def get_customer_express(token: str, current_user: dict = Depends(verify_token)):
+
+    with get_connection() as conn:
+
+        set_tenant_schema(conn, current_user["tenant_schema"])
+
+        with conn.cursor() as cur:
+
+            cur.execute("""
+                SELECT
+                    customers_express_id,
+                    customers_express_token_expires_at,
+                    customers_express_link_status
+                FROM customers_express
+                WHERE customers_express_token = %s
+            """, (token,))
+
+            record = cur.fetchone()
+
+            if not record:
+                raise HTTPException(status_code=404, detail="invalid_link")
+
+            customers_express_id, expires_at, status = record
+
+            if expires_at and expires_at < datetime.utcnow():
+                raise HTTPException(status_code=400, detail="expired_link")
+
+            if status == "completed":
+                raise HTTPException(status_code=400, detail="form_completed")
+
+            cur.execute("""
+                SELECT
+                    customer_capture_settings_field,
+                    customer_capture_settings_is_required,
+                    customer_capture_settings_display_order
+                FROM customer_capture_settings
+                WHERE customer_capture_settings_is_active = TRUE
+                ORDER BY customer_capture_settings_display_order
+            """)
+
+            columns = [desc[0] for desc in cur.description]
+            rows = cur.fetchall()
+
+            fields = [dict(zip(columns, row)) for row in rows]
+
+            identifier_types = []
+
+            if any(f["customer_capture_settings_field"] == "identifier_type" for f in fields):
+
+                cur.execute("""
+                    SELECT
+                        identifier_type_settings_code,
+                        identifier_type_settings_label
+                    FROM identifier_type_settings
+                    WHERE identifier_type_settings_is_active = TRUE
+                    ORDER BY identifier_type_settings_display_order
+                """)
+
+                columns = [desc[0] for desc in cur.description]
+                rows = cur.fetchall()
+
+                identifier_types = [dict(zip(columns, row)) for row in rows]
+
+    return {
+        "status": "ok",
+        "token": token,
+        "fields": fields,
+        "identifier_types": identifier_types
+    }
+

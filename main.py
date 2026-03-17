@@ -32,7 +32,7 @@ app.add_middleware(
         "https://kivor-frontend.onrender.com"
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -42,11 +42,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 security = HTTPBearer()
 
-
-
-@app.options("/{full_path:path}")
-def options_handler(full_path: str):
-    return Response(status_code=200)
     
 # =========================
 # DB CONNECTION

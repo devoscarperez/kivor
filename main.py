@@ -333,6 +333,9 @@ def login(request: Request, data: dict = Body(...)):
 # =========================
 # LOGIN USERNAME
 # =========================
+@app.options("/login-username")
+def options_login_username():
+    return {"ok": True}
 
 @app.post("/login-username")
 def login_username(data: dict = Body(...)):

@@ -812,14 +812,27 @@ def search_customers_express(mobile: str, current_user: dict = Depends(verify_to
                 field_rows = cur.fetchall()
                 fields = [r[0] for r in field_rows]
 
+                
                 # Buscar registros del cliente
-                cur.execute("""
-                    SELECT *
-                    FROM lindasylunaticas.customers_express
-                    WHERE customers_express_mobile = %s
-                    AND customers_express_completed_at IS NOT NULL
-                    ORDER BY customers_express_completed_at DESC
-                """, (mobile,))
+                # cur.execute("""
+                #     SELECT *
+                #     FROM lindasylunaticas.customers_express
+                #     WHERE customers_express_mobile = %s
+                #     AND customers_express_completed_at IS NOT NULL
+                #     ORDER BY customers_express_completed_at DESC
+                # """, (mobile,))
+                # 
+
+                tenant_schema = current_user["tenant_schema"]
+                query = f"""
+                SELECT *
+                FROM {tenant_schema}.customers_express
+                WHERE customers_express_mobile = %s
+                AND customers_express_completed_at IS NOT NULL
+                ORDER BY customers_express_completed_at DESC
+                """
+
+                cur.execute(query, (mobile,))
 
                 columns = [desc[0] for desc in cur.description]
                 rows = cur.fetchall()

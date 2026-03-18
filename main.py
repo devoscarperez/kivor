@@ -832,6 +832,8 @@ def search_customers_express(mobile: str, current_user: dict = Depends(verify_to
                 ORDER BY customers_express_completed_at DESC
                 """
 
+                print("QUERY:", query)
+                print("PARAMS:", mobile)
                 cur.execute(query, (mobile,))
 
                 columns = [desc[0] for desc in cur.description]

@@ -688,7 +688,7 @@ def generate_customer_express(current_user: dict = Depends(verify_token)):
         with conn.cursor() as cur:
 
             cur.execute("""
-                INSERT INTO customers_express
+                INSERT INTO lindasylunaticas.customers_express
                 (
                     customers_express_token,
                     customers_express_token_created_at,
@@ -735,7 +735,7 @@ def get_customer_express(token: str, current_user: dict = Depends(verify_token))
                     customers_express_id,
                     customers_express_token_expires_at,
                     customers_express_link_status
-                FROM customers_express
+                FROM lindasylunaticas.customers_express
                 WHERE customers_express_token = %s
             """, (token,))
 
@@ -757,7 +757,7 @@ def get_customer_express(token: str, current_user: dict = Depends(verify_token))
                     customer_capture_settings_field,
                     customer_capture_settings_is_required,
                     customer_capture_settings_display_order
-                FROM customer_capture_settings
+                FROM lindasylunaticas.customer_capture_settings
                 WHERE customer_capture_settings_is_active = TRUE
                 ORDER BY customer_capture_settings_display_order
             """)
@@ -775,7 +775,7 @@ def get_customer_express(token: str, current_user: dict = Depends(verify_token))
                     SELECT
                         identifier_type_settings_code,
                         identifier_type_settings_label
-                    FROM identifier_type_settings
+                    FROM lindasylunaticas.identifier_type_settings
                     WHERE identifier_type_settings_is_active = TRUE
                     ORDER BY identifier_type_settings_display_order
                 """)
@@ -804,7 +804,7 @@ def search_customers_express(mobile: str, current_user: dict = Depends(verify_to
                 cur.execute("""
                     SELECT
                         customer_capture_settings_field
-                    FROM customer_capture_settings
+                    FROM lindasylunaticas.customer_capture_settings
                     WHERE customer_capture_settings_is_active = TRUE
                     ORDER BY customer_capture_settings_display_order
                 """)
@@ -815,7 +815,7 @@ def search_customers_express(mobile: str, current_user: dict = Depends(verify_to
                 # Buscar registros del cliente
                 cur.execute("""
                     SELECT *
-                    FROM customers_express
+                    FROM lindasylunaticas.customers_express
                     WHERE customers_express_mobile = %s
                     AND customers_express_completed_at IS NOT NULL
                     ORDER BY customers_express_completed_at DESC

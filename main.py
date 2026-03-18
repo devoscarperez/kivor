@@ -793,7 +793,8 @@ def get_customer_express(token: str, current_user: dict = Depends(verify_token))
         "identifier_types": identifier_types
     }
 
-@app.get("/customers-express/search/{mobile}")
+
+@app.get("/customers-express/by-mobile/{mobile}")
 def search_customers_express(mobile: str, current_user: dict = Depends(verify_token)):
 
     try:

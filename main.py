@@ -9,6 +9,7 @@ from typing import Optional
 import psycopg
 import hashlib
 import os
+import logging
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 from fastapi.responses import Response
 
@@ -831,9 +832,12 @@ def search_customers_express(mobile: str, current_user: dict = Depends(verify_to
                 AND customers_express_completed_at IS NOT NULL
                 ORDER BY customers_express_completed_at DESC
                 """
-
-                print("QUERY:", query)
-                print("PARAMS:", mobile)
+                 
+                logging.basicConfig(level=logging.INFO)
+                
+                logging.info(f"TENANT: {tenant_schema}")
+                logging.info(f"MOBILE: {mobile}")
+                logging.info(f"QUERY: {query}")
                 cur.execute(query, (mobile,))
 
                 columns = [desc[0] for desc in cur.description]

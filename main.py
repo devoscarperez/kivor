@@ -689,7 +689,7 @@ def generate_customer_express(current_user: dict = Depends(verify_token)):
         with conn.cursor() as cur:
 
             cur.execute("""
-                INSERT INTO lindasylunaticas.customers_express
+                INSERT INTO customers_express
                 (
                     customers_express_token,
                     customers_express_token_created_at,

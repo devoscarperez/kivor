@@ -690,15 +690,14 @@ def get_sessions(current_user: dict = Depends(verify_token)):
 def generate_customer_express(current_user: dict = Depends(verify_token)):
 
     token = uuid4().hex
+    tenant_schema = current_user["tenant_schema"]
 
     with get_connection() as conn:
 
-        set_tenant_schema(conn, current_user["tenant_schema"])
-
         with conn.cursor() as cur:
 
-            cur.execute("""
-                INSERT INTO customers_express
+            cur.execute(f"""
+                INSERT INTO {tenant_schema}.customers_express
                 (
                     customers_express_token,
                     customers_express_token_created_at,

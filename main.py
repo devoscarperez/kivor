@@ -731,7 +731,8 @@ def generate_customer_express(current_user: dict = Depends(verify_token)):
 # ===========================
 
 @app.get("/customers-express/{token}")
-def get_customer_express(token: str, current_user: dict = Depends(verify_token)):
+def get_customer_express(token: str):
+# def get_customer_express(token: str, current_user: dict = Depends(verify_token)):
 
     with get_connection() as conn:
 
@@ -746,6 +747,7 @@ def get_customer_express(token: str, current_user: dict = Depends(verify_token))
                     customers_express_link_status
                 FROM lindasylunaticas.customers_express
                 WHERE customers_express_token = %s
+                 AND customers_express_token_expires_at > NOW()
             """, (token,))
 
             record = cur.fetchone()

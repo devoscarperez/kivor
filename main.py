@@ -28,10 +28,11 @@ app = FastAPI(title="KIVOR Backend")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://kivor-frontend-dev.onrender.com",
-        "https://kivor-frontend.onrender.com"
-    ],
+    allow_origins=["*"],
+#    allow_origins=[
+#        "https://kivor-frontend-dev.onrender.com",
+#        "https://kivor-frontend.onrender.com"
+#    ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],

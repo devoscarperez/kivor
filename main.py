@@ -55,6 +55,7 @@ def options_handler(full_path: str):
 # =========================
 
 def get_connection():
+    
 
     database_url = os.getenv("DATABASE_URL")
 
@@ -81,7 +82,9 @@ def get_connection():
 
     return psycopg.connect(clean_url)
 
-
+def set_tenant_schema(conn, schema):
+    with conn.cursor() as cur:
+        cur.execute(f"SET search_path TO {schema}")
 
 # =========================
 # Valida RUT

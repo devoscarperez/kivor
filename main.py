@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import psycopg
+from psycopg import sql
 import hashlib
 import os
 import logging
@@ -686,18 +687,40 @@ def get_sessions(current_user: dict = Depends(verify_token)):
 # EXPRESS CUSTOMER
 # =========================
 
+
+
 @app.post("/customers-express/generate")
 def generate_customer_express(current_user: dict = Depends(verify_token)):
 
+    # 🔑 Se genera un token único para el link de Customer Express
+    # Este token será usado por el cliente final para acceder al formulario (cx.html)
     token = uuid4().hex
-    tenant_schema = current_user["tenant_schema"]
 
+    # 🏢 Se obtiene el schema del tenant desde el usuario autenticado (multi-tenant)
+    # Cada empresa tiene su propio schema en la base de datos
+    tenant_schema = current_user.get("tenant_schema")
+
+    # 🛡 Validación de seguridad del schema
+    # - Evita valores nulos
+    # - Evita nombres inválidos
+    # - Previene posibles inyecciones SQL en identificadores
+    if not tenant_schema or not tenant_schema.isidentifier():
+        raise HTTPException(status_code=400, detail="Invalid tenant schema")
+
+    # 🔌 Se abre conexión a la base de datos
+    # Uso de context manager para asegurar cierre correcto de conexión
     with get_connection() as conn:
 
+        # 🧾 Se crea cursor para ejecutar queries
         with conn.cursor() as cur:
 
-            cur.execute(f"""
-                INSERT INTO {tenant_schema}.customers_express
+            # 🧱 Construcción de query segura multi-tenant
+            # IMPORTANTE:
+            # - NO usar f-strings directos para schema
+            # - Se usa sql.Identifier para evitar SQL injection
+            # - El schema se inserta de forma segura en la query
+            query = sql.SQL("""
+                INSERT INTO {}.customers_express
                 (
                     customers_express_token,
                     customers_express_token_created_at,
@@ -712,17 +735,24 @@ def generate_customer_express(current_user: dict = Depends(verify_token)):
                     'created'
                 )
                 RETURNING customers_express_id
-            """, (token,))
+            """).format(
+                sql.Identifier(tenant_schema)  # 🔐 Inserción segura del schema
+            )
 
+            # 💾 Ejecución del INSERT
+            # El token se pasa como parámetro para evitar SQL injection en valores
+            cur.execute(query, (token,))
+
+            # 📥 Obtiene el ID generado del registro
             result = cur.fetchone()
 
-    link = f"https://kivor-frontend.onrender.com/cx.html?token={token}"
-
+    # 📤 Respuesta al frontend
+    # Se retorna el token para que el frontend construya el link dinámicamente
+    # (evitando acoplar backend con URLs de frontend)
     return {
         "status": "ok",
         "customers_express_id": result[0],
-        "token": token,
-        "link": link
+        "token": token
     }
 
 

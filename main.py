@@ -844,7 +844,7 @@ def get_customer_express(token: str):
 
 @app.post("/customers-express/{token}")
 async def save_customer_express(token: str, payload: dict = Body(...)):
-
+    print("🔥 PAYLOAD:", payload)
     with get_connection() as conn:
         with conn.cursor() as cur:
 
@@ -900,6 +900,8 @@ async def save_customer_express(token: str, payload: dict = Body(...)):
                 sql.Identifier(tenant_schema),
                 sql.SQL(", ").join(fields)
             )
+            print("🔥 VALUES:", values)
+            print("🔥 FIELDS:", fields)
 
             cur.execute(query, values)
 

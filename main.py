@@ -803,6 +803,7 @@ def get_customer_express(token: str):
             query_fields = sql.SQL("""
                 SELECT
                     customer_capture_settings_field,
+                    customer_capture_settings_label,
                     customer_capture_settings_is_required,
                     customer_capture_settings_display_order
                 FROM {}.customer_capture_settings

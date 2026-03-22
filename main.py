@@ -842,7 +842,58 @@ def get_customer_express(token: str):
         "identifier_types": identifier_types
     }
 
+@app.post("/customers-express/{token}")
+async def save_customer_express(token: str, payload: dict = Body(...)):
 
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+
+            # 🔥 1. Resolver tenant desde token
+            cur.execute("""
+                SELECT tenant_schema
+                FROM core.customers_express_token_map
+                WHERE token = %s
+            """, (token,))
+
+            row = cur.fetchone()
+
+            if not row:
+                raise HTTPException(status_code=404, detail="invalid_link")
+
+            tenant_schema = row[0]
+
+            if not tenant_schema or not tenant_schema.isidentifier():
+                raise HTTPException(status_code=400, detail="invalid_tenant")
+
+            # 🔥 2. Construir UPDATE dinámico
+            fields = []
+            values = []
+
+            for key, value in payload.items():
+                column = f"customers_express_{key}"
+                fields.append(sql.SQL("{} = %s").format(sql.Identifier(column)))
+                values.append(value)
+
+            # agregar campos de control
+            fields.append(sql.SQL("customers_express_completed_at = NOW()"))
+            fields.append(sql.SQL("customers_express_link_status = 'completed'"))
+
+            values.append(token)
+
+            query = sql.SQL("""
+                UPDATE {}.customers_express
+                SET {}
+                WHERE customers_express_token = %s
+            """).format(
+                sql.Identifier(tenant_schema),
+                sql.SQL(", ").join(fields)
+            )
+
+            cur.execute(query, values)
+
+    return {
+        "status": "ok"
+    }
 @app.get("/customers-express/by-mobile/{mobile}")
 def search_customers_express(mobile: str, current_user: dict = Depends(verify_token)):
 

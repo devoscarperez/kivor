@@ -870,12 +870,12 @@ async def save_customer_express(token: str, payload: dict = Body(...)):
             values = []
 
             for key, value in payload.items():
-                # 🔥 evitar doble prefijo
-                if key.startswith("customers_express_"):
-                    column = key
-                else:
-                    column = f"customers_express_{key}"
-                    
+            
+                # 🔥 quitar prefijo "customers_" si existe
+                clean_key = key.replace("customers_", "")
+            
+                column = f"customers_express_{clean_key}"
+            
                 fields.append(
                     sql.SQL("{} = %s").format(sql.Identifier(column))
                 )

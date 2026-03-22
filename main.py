@@ -692,32 +692,22 @@ def get_sessions(current_user: dict = Depends(verify_token)):
 def generate_customer_express(current_user: dict = Depends(verify_token)):
 
     # 🔑 Se genera un token único para el link de Customer Express
-    # Este token será usado por el cliente final para acceder al formulario (cx.html)
     token = uuid4().hex
 
     # 🏢 Se obtiene el schema del tenant desde el usuario autenticado (multi-tenant)
-    # Cada empresa tiene su propio schema en la base de datos
     tenant_schema = current_user.get("tenant_schema")
 
     # 🛡 Validación de seguridad del schema
-    # - Evita valores nulos
-    # - Evita nombres inválidos
-    # - Previene posibles inyecciones SQL en identificadores
     if not tenant_schema or not tenant_schema.isidentifier():
         raise HTTPException(status_code=400, detail="Invalid tenant schema")
 
     # 🔌 Se abre conexión a la base de datos
-    # Uso de context manager para asegurar cierre correcto de conexión
     with get_connection() as conn:
 
         # 🧾 Se crea cursor para ejecutar queries
         with conn.cursor() as cur:
 
             # 🧱 Construcción de query segura multi-tenant
-            # IMPORTANTE:
-            # - NO usar f-strings directos para schema
-            # - Se usa sql.Identifier para evitar SQL injection
-            # - El schema se inserta de forma segura en la query
             query = sql.SQL("""
                 INSERT INTO {}.customers_express
                 (
@@ -735,19 +725,20 @@ def generate_customer_express(current_user: dict = Depends(verify_token)):
                 )
                 RETURNING customers_express_id
             """).format(
-                sql.Identifier(tenant_schema)  # 🔐 Inserción segura del schema
+                sql.Identifier(tenant_schema)
             )
 
-            # 💾 Ejecución del INSERT
-            # El token se pasa como parámetro para evitar SQL injection en valores
+            # 💾 Inserta en tabla del tenant
             cur.execute(query, (token,))
-
-            # 📥 Obtiene el ID generado del registro
             result = cur.fetchone()
 
+            # 🔥 NUEVO: guardar relación token → tenant (tabla global)
+            cur.execute("""
+                INSERT INTO core.customers_express_token_map (token, tenant_schema)
+                VALUES (%s, %s)
+            """, (token, tenant_schema))
+
     # 📤 Respuesta al frontend
-    # Se retorna el token para que el frontend construya el link dinámicamente
-    # (evitando acoplar backend con URLs de frontend)
     return {
         "status": "ok",
         "customers_express_id": result[0],

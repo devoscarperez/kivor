@@ -752,24 +752,40 @@ def generate_customer_express(current_user: dict = Depends(verify_token)):
 
 @app.get("/customers-express/{token}")
 def get_customer_express(token: str):
-# def get_customer_express(token: str, current_user: dict = Depends(verify_token)):
 
     with get_connection() as conn:
-
-        set_tenant_schema(conn, current_user["tenant_schema"])
-
         with conn.cursor() as cur:
 
+            # 🔥 PASO 1: resolver tenant desde tabla global
             cur.execute("""
+                SELECT tenant_schema
+                FROM core.customers_express_token_map
+                WHERE token = %s
+            """, (token,))
+
+            row = cur.fetchone()
+
+            if not row:
+                raise HTTPException(status_code=404, detail="invalid_link")
+
+            tenant_schema = row[0]
+
+            # 🛡 Validación básica
+            if not tenant_schema or not tenant_schema.isidentifier():
+                raise HTTPException(status_code=400, detail="invalid_tenant")
+
+            # 🔥 PASO 2: query dinámica segura al tenant
+            query = sql.SQL("""
                 SELECT
                     customers_express_id,
                     customers_express_token_expires_at,
                     customers_express_link_status
-                FROM lindasylunaticas.customers_express
+                FROM {}.customers_express
                 WHERE customers_express_token = %s
-                 AND customers_express_token_expires_at > NOW()
-            """, (token,))
+                AND customers_express_token_expires_at > NOW()
+            """).format(sql.Identifier(tenant_schema))
 
+            cur.execute(query, (token,))
             record = cur.fetchone()
 
             if not record:
@@ -783,37 +799,40 @@ def get_customer_express(token: str):
             if status == "completed":
                 raise HTTPException(status_code=400, detail="form_completed")
 
-            cur.execute("""
+            # 🔥 PASO 3: obtener configuración de campos (tenant)
+            query_fields = sql.SQL("""
                 SELECT
                     customer_capture_settings_field,
                     customer_capture_settings_is_required,
                     customer_capture_settings_display_order
-                FROM lindasylunaticas.customer_capture_settings
+                FROM {}.customer_capture_settings
                 WHERE customer_capture_settings_is_active = TRUE
                 ORDER BY customer_capture_settings_display_order
-            """)
+            """).format(sql.Identifier(tenant_schema))
+
+            cur.execute(query_fields)
 
             columns = [desc[0] for desc in cur.description]
             rows = cur.fetchall()
-
             fields = [dict(zip(columns, row)) for row in rows]
 
             identifier_types = []
 
             if any(f["customer_capture_settings_field"] == "identifier_type" for f in fields):
 
-                cur.execute("""
+                query_identifiers = sql.SQL("""
                     SELECT
                         identifier_type_settings_code,
                         identifier_type_settings_label
-                    FROM lindasylunaticas.identifier_type_settings
+                    FROM {}.identifier_type_settings
                     WHERE identifier_type_settings_is_active = TRUE
                     ORDER BY identifier_type_settings_display_order
-                """)
+                """).format(sql.Identifier(tenant_schema))
+
+                cur.execute(query_identifiers)
 
                 columns = [desc[0] for desc in cur.description]
                 rows = cur.fetchall()
-
                 identifier_types = [dict(zip(columns, row)) for row in rows]
 
     return {

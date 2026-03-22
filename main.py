@@ -870,9 +870,21 @@ async def save_customer_express(token: str, payload: dict = Body(...)):
             values = []
 
             for key, value in payload.items():
-                column = f"customers_express_{key}"
-                fields.append(sql.SQL("{} = %s").format(sql.Identifier(column)))
+                # 🔥 evitar doble prefijo
+                if key.startswith("customers_express_"):
+                    column = key
+                else:
+                    column = f"customers_express_{key}"
+                    
+                fields.append(
+                    sql.SQL("{} = %s").format(sql.Identifier(column))
+                )
                 values.append(value)
+
+            # for key, value in payload.items():
+            #     column = f"customers_express_{key}"
+            #     fields.append(sql.SQL("{} = %s").format(sql.Identifier(column)))
+            #     values.append(value)
 
             # agregar campos de control
             fields.append(sql.SQL("customers_express_completed_at = NOW()"))

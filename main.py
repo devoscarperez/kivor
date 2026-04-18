@@ -970,3 +970,20 @@ def search_customers_express(mobile: str, current_user: dict = Depends(verify_to
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/logout")
+def logout(current_user: dict = Depends(verify_token)):
+
+    session_id = current_user.get("session_id")
+
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Sesión no encontrada")
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE core.user_session
+                SET revoked = TRUE
+                WHERE session_id = %s
+            """, (session_id,))
+
+    return {"status": "ok", "message": "Sesión cerrada"}

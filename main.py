@@ -987,3 +987,44 @@ def logout(current_user: dict = Depends(verify_token)):
             """, (session_id,))
 
     return {"status": "ok", "message": "Sesión cerrada"}
+
+
+@app.post("/logout-session")
+def logout_session(
+    data: dict = Body(...),
+    current_user: dict = Depends(verify_token)
+):
+
+    session_id = data.get("session_id")
+
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id requerido")
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+
+            # 🔒 Validar que la sesión pertenece al usuario
+            cur.execute("""
+                SELECT user_name
+                FROM core.user_session
+                WHERE session_id = %s
+            """, (session_id,))
+
+            row = cur.fetchone()
+
+            if not row:
+                raise HTTPException(status_code=404, detail="Sesión no encontrada")
+
+            session_user = row[0]
+
+            if session_user != current_user["username"]:
+                raise HTTPException(status_code=403, detail="No autorizado")
+
+            # 🔥 Revocar sesión
+            cur.execute("""
+                UPDATE core.user_session
+                SET revoked = TRUE
+                WHERE session_id = %s
+            """, (session_id,))
+
+    return {"status": "ok", "message": "Sesión cerrada"}

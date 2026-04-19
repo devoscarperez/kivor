@@ -1054,7 +1054,7 @@ def create_user(data: dict):
                 user_lastname,
                 user_group_id
             )
-            VALUES (%s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s)
             RETURNING user_id
         """, (
             data["user_nickname"],

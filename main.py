@@ -1034,11 +1034,16 @@ def logout_session(
 @app.post("/users")
 def create_user(data: dict):
 
+    print("==== CREATE USER START ====")
+    print("DATA:", data)
+
     try:
-        conn = connect(
-            "postgresql://USER:PASSWORD@HOST:PORT/DBNAME"
-        )
+        conn = connect("postgresql://USER:PASSWORD@HOST:PORT/DBNAME")
+        print("DB CONNECTED")
+
         cur = conn.cursor()
+
+        print("EXECUTING INSERT...")
 
         cur.execute("""
             INSERT INTO core."user" (
@@ -1052,20 +1057,27 @@ def create_user(data: dict):
             RETURNING user_id
         """, (
             data["user_name"],
-            data["user_password"],  # 🔥 luego lo cambiamos a bcrypt
+            data["user_password"],
             data["user_firstname"],
             data["user_lastname"],
             int(data["user_group_id"])
         ))
 
-        user_id = cur.fetchone()[0]
+        print("INSERT OK")
+
+        user_id = cur.fetchone()
+        print("USER ID:", user_id)
 
         conn.commit()
+        print("COMMIT OK")
+
         cur.close()
         conn.close()
+
+        print("==== CREATE USER END ====")
 
         return {"user_id": user_id}
 
     except Exception as e:
-        print("ERROR CREATE USER:", e)
+        print("ERROR CREATE USER:", str(e))
         return {"detail": str(e)}

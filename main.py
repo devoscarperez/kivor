@@ -1032,4 +1032,7 @@ def logout_session(
 
 @app.post("/users")
 def create_user(data: dict):
-    return {"message": "ok"}
+    print("DATA RECIBIDA:", data)
+    return {
+        "received": data
+    }

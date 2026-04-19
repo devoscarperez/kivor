@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 import psycopg
+from psycopg import connect
 from psycopg import sql
 import hashlib
 import os
@@ -1032,7 +1033,39 @@ def logout_session(
 
 @app.post("/users")
 def create_user(data: dict):
-    print("DATA RECIBIDA:", data)
-    return {
-        "received": data
-    }
+
+    try:
+        conn = connect(
+            "postgresql://USER:PASSWORD@HOST:PORT/DBNAME"
+        )
+        cur = conn.cursor()
+
+        cur.execute("""
+            INSERT INTO core."user" (
+                user_name,
+                user_password_hash,
+                user_firstname,
+                user_lastname,
+                user_group_id
+            )
+            VALUES (%s, %s, %s, %s, %s)
+            RETURNING user_id
+        """, (
+            data["user_name"],
+            data["user_password"],  # 🔥 luego lo cambiamos a bcrypt
+            data["user_firstname"],
+            data["user_lastname"],
+            int(data["user_group_id"])
+        ))
+
+        user_id = cur.fetchone()[0]
+
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return {"user_id": user_id}
+
+    except Exception as e:
+        print("ERROR CREATE USER:", e)
+        return {"detail": str(e)}

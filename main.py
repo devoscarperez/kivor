@@ -1047,6 +1047,7 @@ def create_user(data: dict):
 
         cur.execute("""
             INSERT INTO core."user" (
+                user_nickname,
                 user_name,
                 user_password_hash,
                 user_firstname,
@@ -1056,6 +1057,7 @@ def create_user(data: dict):
             VALUES (%s, %s, %s, %s, %s)
             RETURNING user_id
         """, (
+            data["user_nickname"],
             data["user_name"],
             data["user_password"],
             data["user_firstname"],

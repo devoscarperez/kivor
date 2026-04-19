@@ -1038,7 +1038,7 @@ def create_user(data: dict):
     print("DATA:", data)
 
     try:
-        conn = connect("postgresql://USER:PASSWORD@HOST:PORT/DBNAME")
+        conn = get_connection()
         print("DB CONNECTED")
 
         cur = conn.cursor()

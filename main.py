@@ -1028,3 +1028,8 @@ def logout_session(
             """, (session_id,))
 
     return {"status": "ok", "message": "Sesión cerrada"}
+
+
+@app.post("/users")
+def create_user(data: dict):
+    return {"message": "ok"}

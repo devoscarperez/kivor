@@ -1,42 +1,24 @@
-from core.db import get_connection, set_tenant_schema
-from core.security import create_access_token, verify_token
-from core.security import get_token_expiration_minutes
+from core.db import get_connection
+
 from routes import auth
 from routes import customers_express
 from routes import users
 from routes import analytics
 from routes import menu
 
-
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
-from uuid import uuid4
-
-from fastapi import FastAPI, HTTPException, Depends, Request, Body
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional
-
-
-from psycopg import sql
-import hashlib
-import os
-import logging
-
 from fastapi.responses import Response
+
+import os
+
 
 
 # =========================
 # MODELOS
 # =========================
 
-class PrecioUpdate(BaseModel):
-    listprice: Optional[int] = None
-    professionalprice: Optional[int] = None
-    salonpercentage: Optional[int] = None
-    professionalpercentage: Optional[int] = None
-    reason_id: int
+
 
 app = FastAPI(title="KIVOR Backend")
 

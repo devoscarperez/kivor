@@ -5,6 +5,7 @@ from services.analytics_service import get_familias_service
 from services.analytics_service import get_nivel2_service
 from services.analytics_service import get_nivel3_service
 from services.analytics_service import get_nivel4_service
+from services.analytics_service import get_precios_service
 
 router = APIRouter()
 
@@ -95,39 +96,7 @@ def obtener_precios(
     current_user: dict = Depends(verify_token)
 ):
 
-    query = """
-    SELECT family,
-           level2,
-           level3,
-           level4,
-           servicekey,
-           listprice,
-           professionalprice,
-           salonpercentage,
-           professionalpercentage
-    FROM core.prices
-    WHERE family = %s
-    """
-
-    params = [family]
-
-    if level2:
-        query += " AND level2 = %s"
-        params.append(level2)
-
-    if level3:
-        query += " AND level3 = %s"
-        params.append(level3)
-
-    if level4:
-        query += " AND level4 = %s"
-        params.append(level4)
-
-    query += " ORDER BY servicekey"
-
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(query, tuple(params))
-            columns = [desc[0] for desc in cur.description]
-            rows = cur.fetchall()
-            return [dict(zip(columns, row)) for row in rows]
+    try:
+        return get_precios_service(family, level2, level3, level4)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

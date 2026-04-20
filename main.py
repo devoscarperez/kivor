@@ -94,12 +94,7 @@ def get_config():
     }
 
 
-# =========================
-# CONTROL PERMISOS
-# =========================
 
-def require_data_write_permission(current_user: dict):
-    pass
     
 # =========================
 # ROOT

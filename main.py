@@ -1,5 +1,7 @@
 from core.db import get_connection, set_tenant_schema
 from core.security import create_access_token, verify_token
+from core.security import get_token_expiration_minutes
+
 
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
@@ -261,7 +263,7 @@ def login(request: Request, data: dict = Body(...)):
     user_agent = request.headers.get("user-agent")
 
     session_id = str(uuid4())
-    expires_at = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expires_at = datetime.utcnow() + timedelta(minutes=get_token_expiration_minutes())
 
     with get_connection() as conn:
         with conn.cursor() as cur:

@@ -6,6 +6,7 @@ from services.analytics_service import get_nivel2_service
 from services.analytics_service import get_nivel3_service
 from services.analytics_service import get_nivel4_service
 from services.analytics_service import get_precios_service
+from services.analytics_service import get_ganancias_por_mes_service
 
 router = APIRouter()
 
@@ -16,36 +17,13 @@ def ganancias_por_mes(mes: str, current_user: dict = Depends(verify_token)):
     if not mes.isdigit() or len(mes) != 2 or int(mes) < 1 or int(mes) > 12:
         raise HTTPException(status_code=400, detail="Mes inválido. Usa formato 01-12.")
 
-    query = """
-    SELECT 
-        TO_CHAR(v.date,'YYYYMM') AS fecha,
-        FLOOR(SUM(CASE WHEN v.family='CABELLO' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS cabello,
-        FLOOR(SUM(CASE WHEN v.family='MANOS_Y_PIES' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS manos_y_pies,
-        FLOOR(SUM(CASE WHEN v.family='DEPILACION' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS depilacion,
-        FLOOR(SUM(CASE WHEN v.family='CEJAS_Y_PESTAÑAS' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS cejas_y_pestanas,
-        FLOOR(SUM(CASE WHEN v.family='FACIALES' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS faciales,
-        FLOOR(SUM(CASE WHEN v.family='CORPORAL' THEN (v.listprice-v.amounttopayprofessional-v.salondiscount) ELSE 0 END)/(1+(19.0/100))) AS corporal
-    FROM sales v
-    WHERE TO_CHAR(v.date,'MM') = %s
-    AND v.family IN ('CABELLO','MANOS_Y_PIES','DEPILACION','CEJAS_Y_PESTAÑAS','FACIALES','CORPORAL')
-    GROUP BY TO_CHAR(v.date,'YYYYMM')
-    ORDER BY fecha;
-    """
-
-    with get_connection() as conn:
-        set_tenant_schema(conn, current_user["tenant_schema"])
-        with conn.cursor() as cur:
-            cur.execute(query, (mes,))
-            columns = [desc[0] for desc in cur.description]
-            rows = cur.fetchall()
-
-    result = [dict(zip(columns, row)) for row in rows]
-
-    return {
-        "mes": mes,
-        "data": result
-    }
-
+    try:
+        return get_ganancias_por_mes_service(
+            mes,
+            current_user["tenant_schema"]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/familias")
 def obtener_familias(current_user: dict = Depends(verify_token)):

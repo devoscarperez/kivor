@@ -4,6 +4,7 @@ from core.security import verify_token
 from services.analytics_service import get_familias_service
 from services.analytics_service import get_nivel2_service
 from services.analytics_service import get_nivel3_service
+from services.analytics_service import get_nivel4_service
 
 router = APIRouter()
 
@@ -79,22 +80,8 @@ def obtener_nivel4(
     current_user: dict = Depends(verify_token)
 ):
 
-    query = """
-    SELECT DISTINCT level4
-    FROM core.prices
-    WHERE family = %s
-    AND level2 = %s
-    AND level3 = %s
-    AND level4 IS NOT NULL
-    ORDER BY level4;
-    """
-
     try:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(query, (family, level2, level3))
-                rows = cur.fetchall()
-                return [r[0] for r in rows]
+        return get_nivel4_service(family, level2, level3)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

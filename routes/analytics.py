@@ -3,6 +3,7 @@ from core.db import get_connection, set_tenant_schema
 from core.security import verify_token
 from services.analytics_service import get_familias_service
 from services.analytics_service import get_nivel2_service
+from services.analytics_service import get_nivel3_service
 
 router = APIRouter()
 
@@ -64,21 +65,8 @@ def obtener_nivel2(family: str, current_user: dict = Depends(verify_token)):
 @router.get("/niveles3")
 def obtener_nivel3(family: str, level2: str, current_user: dict = Depends(verify_token)):
 
-    query = """
-    SELECT DISTINCT level3
-    FROM core.prices
-    WHERE family = %s
-    AND level2 = %s
-    AND level3 IS NOT NULL
-    ORDER BY level3;
-    """
-
     try:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(query, (family, level2))
-                rows = cur.fetchall()
-                return [r[0] for r in rows]
+        return get_nivel3_service(family, level2)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

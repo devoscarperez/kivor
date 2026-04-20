@@ -1,5 +1,23 @@
 from core.db import get_connection
 
+def get_nivel3_service(family: str, level2: str):
+
+    query = """
+    SELECT DISTINCT level3
+    FROM core.prices
+    WHERE family = %s
+    AND level2 = %s
+    AND level3 IS NOT NULL
+    ORDER BY level3;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (family, level2))
+            rows = cur.fetchall()
+
+    return [r[0] for r in rows]
+
 
 def get_familias_service():
 

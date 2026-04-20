@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from core.db import get_connection, set_tenant_schema
 from core.security import verify_token
+from services.analytics_service import get_familias_service
 
 router = APIRouter()
 
@@ -45,19 +46,8 @@ def ganancias_por_mes(mes: str, current_user: dict = Depends(verify_token)):
 @router.get("/familias")
 def obtener_familias(current_user: dict = Depends(verify_token)):
 
-    query = """
-    SELECT DISTINCT family
-    FROM core.prices
-    WHERE family IS NOT NULL
-    ORDER BY family;
-    """
-
     try:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(query)
-                rows = cur.fetchall()
-                return [r[0] for r in rows]
+        return get_familias_service()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

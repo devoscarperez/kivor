@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, Body
+from services.customer_express_service import search_customer_express_by_mobile_service
 
 from core.security import verify_token
 
@@ -35,53 +36,13 @@ async def save_customer_express(token: str, payload: dict = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-
 @router.get("/by-mobile/{mobile}")
-def search_customers_express(mobile: str, current_user: dict = Depends(verify_token)):
+def search_customers_express(
+    mobile: str,
+    current_user: dict = Depends(verify_token)
+):
 
     try:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-
-                cur.execute("""
-                    SELECT
-                        customer_capture_settings_field
-                    FROM lindasylunaticas.customer_capture_settings
-                    WHERE customer_capture_settings_is_active = TRUE
-                    ORDER BY customer_capture_settings_display_order
-                """)
-
-                field_rows = cur.fetchall()
-                fields = [r[0] for r in field_rows]
-
-                tenant_schema = current_user["tenant_schema"]
-
-                query = f"""
-                SELECT *
-                FROM {tenant_schema}.customers_express
-                WHERE customers_express_mobile = %s
-                AND customers_express_completed_at IS NOT NULL
-                ORDER BY customers_express_completed_at DESC
-                """
-
-                logging.basicConfig(level=logging.INFO)
-
-                logging.info(f"TENANT: {tenant_schema}")
-                logging.info(f"MOBILE: {mobile}")
-                logging.info(f"QUERY: {query}")
-
-                cur.execute(query, (mobile,))
-
-                columns = [desc[0] for desc in cur.description]
-                rows = cur.fetchall()
-
-        results = [dict(zip(columns, row)) for row in rows]
-
-        return {
-            "status": "ok",
-            "fields": fields,
-            "results": results
-        }
-
+        return search_customer_express_by_mobile_service(mobile, current_user)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

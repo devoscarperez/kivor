@@ -4,6 +4,61 @@ from psycopg import sql
 from core.db import get_connection
 from datetime import datetime
 
+def save_customer_express_service(token: str, payload: dict):
+
+    from psycopg import sql
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+
+            # resolver tenant
+            cur.execute("""
+                SELECT tenant_schema
+                FROM core.customers_express_token_map
+                WHERE token = %s
+            """, (token,))
+
+            row = cur.fetchone()
+
+            if not row:
+                raise Exception("invalid_link")
+
+            tenant_schema = row[0]
+
+            if not tenant_schema or not tenant_schema.isidentifier():
+                raise Exception("invalid_tenant")
+
+            fields = []
+            values = []
+
+            for key, value in payload.items():
+
+                clean_key = key.replace("customers_", "")
+                column = f"customers_express_{clean_key}"
+
+                fields.append(
+                    sql.SQL("{} = %s").format(sql.Identifier(column))
+                )
+                values.append(value)
+
+            # campos de control
+            fields.append(sql.SQL("customers_express_completed_at = NOW()"))
+            fields.append(sql.SQL("customers_express_link_status = 'completed'"))
+
+            values.append(token)
+
+            query = sql.SQL("""
+                UPDATE {}.customers_express
+                SET {}
+                WHERE customers_express_token = %s
+            """).format(
+                sql.Identifier(tenant_schema),
+                sql.SQL(", ").join(fields)
+            )
+
+            cur.execute(query, values)
+
+    return {"status": "ok"}
 
 def get_customer_express_service(token: str):
 

@@ -4,6 +4,53 @@ from psycopg import sql
 from core.db import get_connection
 from datetime import datetime
 
+def search_customer_express_by_mobile_service(mobile: str, current_user: dict):
+
+    import logging
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+
+            # campos configurados
+            cur.execute("""
+                SELECT
+                    customer_capture_settings_field
+                FROM lindasylunaticas.customer_capture_settings
+                WHERE customer_capture_settings_is_active = TRUE
+                ORDER BY customer_capture_settings_display_order
+            """)
+
+            field_rows = cur.fetchall()
+            fields = [r[0] for r in field_rows]
+
+            tenant_schema = current_user["tenant_schema"]
+
+            query = f"""
+            SELECT *
+            FROM {tenant_schema}.customers_express
+            WHERE customers_express_mobile = %s
+            AND customers_express_completed_at IS NOT NULL
+            ORDER BY customers_express_completed_at DESC
+            """
+
+            logging.basicConfig(level=logging.INFO)
+
+            logging.info(f"TENANT: {tenant_schema}")
+            logging.info(f"MOBILE: {mobile}")
+            logging.info(f"QUERY: {query}")
+
+            cur.execute(query, (mobile,))
+
+            columns = [desc[0] for desc in cur.description]
+            rows = cur.fetchall()
+
+    results = [dict(zip(columns, row)) for row in rows]
+
+    return {
+        "status": "ok",
+        "fields": fields,
+        "results": results
+    }
 def save_customer_express_service(token: str, payload: dict):
 
     from psycopg import sql

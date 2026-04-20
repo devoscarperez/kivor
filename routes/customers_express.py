@@ -1,4 +1,5 @@
 from services.customer_express_service import generate_customer_express_service
+from services.customer_express_service import get_customer_express_service
 
 from fastapi import APIRouter, HTTPException, Depends, Body
 from datetime import datetime
@@ -23,92 +24,10 @@ def generate_customer_express(current_user: dict = Depends(verify_token)):
 @router.get("/{token}")
 def get_customer_express(token: str):
 
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-
-            cur.execute("""
-                SELECT tenant_schema
-                FROM core.customers_express_token_map
-                WHERE token = %s
-            """, (token,))
-
-            row = cur.fetchone()
-
-            if not row:
-                raise HTTPException(status_code=404, detail="invalid_link")
-
-            tenant_schema = row[0]
-
-            if not tenant_schema or not tenant_schema.isidentifier():
-                raise HTTPException(status_code=400, detail="invalid_tenant")
-
-            query = sql.SQL("""
-                SELECT
-                    customers_express_id,
-                    customers_express_token_expires_at,
-                    customers_express_link_status
-                FROM {}.customers_express
-                WHERE customers_express_token = %s
-                AND customers_express_token_expires_at > NOW()
-            """).format(sql.Identifier(tenant_schema))
-
-            cur.execute(query, (token,))
-            record = cur.fetchone()
-
-            if not record:
-                raise HTTPException(status_code=404, detail="invalid_link")
-
-            customers_express_id, expires_at, status = record
-
-            if expires_at and expires_at < datetime.utcnow():
-                raise HTTPException(status_code=400, detail="expired_link")
-
-            if status == "completed":
-                raise HTTPException(status_code=400, detail="form_completed")
-
-            query_fields = sql.SQL("""
-                SELECT
-                    customer_capture_settings_field,
-                    customer_capture_settings_label,
-                    customer_capture_settings_is_required,
-                    customer_capture_settings_display_order
-                FROM {}.customer_capture_settings
-                WHERE customer_capture_settings_is_active = TRUE
-                ORDER BY customer_capture_settings_display_order
-            """).format(sql.Identifier(tenant_schema))
-
-            cur.execute(query_fields)
-
-            columns = [desc[0] for desc in cur.description]
-            rows = cur.fetchall()
-            fields = [dict(zip(columns, row)) for row in rows]
-
-            identifier_types = []
-
-            if any(f["customer_capture_settings_field"] == "identifier_type" for f in fields):
-
-                query_identifiers = sql.SQL("""
-                    SELECT
-                        identifier_type_settings_code,
-                        identifier_type_settings_label
-                    FROM {}.identifier_type_settings
-                    WHERE identifier_type_settings_is_active = TRUE
-                    ORDER BY identifier_type_settings_display_order
-                """).format(sql.Identifier(tenant_schema))
-
-                cur.execute(query_identifiers)
-
-                columns = [desc[0] for desc in cur.description]
-                rows = cur.fetchall()
-                identifier_types = [dict(zip(columns, row)) for row in rows]
-
-    return {
-        "status": "ok",
-        "token": token,
-        "fields": fields,
-        "identifier_types": identifier_types
-    }
-
+    try:
+        return get_customer_express_service(token)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/{token}")
 async def save_customer_express(token: str, payload: dict = Body(...)):

@@ -1,5 +1,6 @@
 from services.customer_express_service import generate_customer_express_service
 from services.customer_express_service import get_customer_express_service
+from services.customer_express_service import save_customer_express_service
 
 from fastapi import APIRouter, HTTPException, Depends, Body
 from datetime import datetime
@@ -32,54 +33,10 @@ def get_customer_express(token: str):
 @router.post("/{token}")
 async def save_customer_express(token: str, payload: dict = Body(...)):
 
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-
-            cur.execute("""
-                SELECT tenant_schema
-                FROM core.customers_express_token_map
-                WHERE token = %s
-            """, (token,))
-
-            row = cur.fetchone()
-
-            if not row:
-                raise HTTPException(status_code=404, detail="invalid_link")
-
-            tenant_schema = row[0]
-
-            if not tenant_schema or not tenant_schema.isidentifier():
-                raise HTTPException(status_code=400, detail="invalid_tenant")
-
-            fields = []
-            values = []
-
-            for key, value in payload.items():
-                clean_key = key.replace("customers_", "")
-                column = f"customers_express_{clean_key}"
-
-                fields.append(
-                    sql.SQL("{} = %s").format(sql.Identifier(column))
-                )
-                values.append(value)
-
-            fields.append(sql.SQL("customers_express_completed_at = NOW()"))
-            fields.append(sql.SQL("customers_express_link_status = 'completed'"))
-
-            values.append(token)
-
-            query = sql.SQL("""
-                UPDATE {}.customers_express
-                SET {}
-                WHERE customers_express_token = %s
-            """).format(
-                sql.Identifier(tenant_schema),
-                sql.SQL(", ").join(fields)
-            )
-
-            cur.execute(query, values)
-
-    return {"status": "ok"}
+    try:
+        return save_customer_express_service(token, payload)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/by-mobile/{mobile}")

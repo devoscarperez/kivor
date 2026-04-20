@@ -50,6 +50,7 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(customers_express.router)
+app.include_router(users.router)
 
 @app.options("/{full_path:path}")
 def options_handler(full_path: str):

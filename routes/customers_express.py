@@ -1,15 +1,12 @@
-from services.customer_express_service import generate_customer_express_service
-from services.customer_express_service import get_customer_express_service
-from services.customer_express_service import save_customer_express_service
-
 from fastapi import APIRouter, HTTPException, Depends, Body
-from datetime import datetime
-from uuid import uuid4
-from psycopg import sql
-import logging
 
-from core.db import get_connection
 from core.security import verify_token
+
+from services.customer_express_service import (
+    generate_customer_express_service,
+    get_customer_express_service,
+    save_customer_express_service
+)
 
 router = APIRouter(prefix="/customers-express")
 

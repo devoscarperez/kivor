@@ -86,3 +86,7 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
     except JWTError:
         raise HTTPException(status_code=401, detail="Token inválido")
+
+
+def get_token_expiration_minutes():
+    return ACCESS_TOKEN_EXPIRE_MINUTES

@@ -1,5 +1,5 @@
 from services.auth_service import login_user
-from schemas.auth_schema import LoginRequest
+from schemas.auth_schema import LoginRequest, LoginUsernameRequest
 
 from fastapi import APIRouter, HTTPException, Request, Body
 from datetime import datetime, timedelta
@@ -31,18 +31,10 @@ def login(request: Request, data: LoginRequest):
         raise HTTPException(status_code=401, detail=str(e))
 
 
-@router.api_route("/login-username", methods=["POST", "OPTIONS"])
-def login_username(data: dict = Body(None)):
+@router.post("/login-username")
+def login_username(data: LoginUsernameRequest):
 
-    if data is None:
-        return {"ok": True}
-
-    username = data.get("username")
-
-    if not username:
-        raise HTTPException(status_code=400, detail="Usuario requerido")
-
-    username = username.strip().lower()
+    username = data.username.strip().lower()
 
     with get_connection() as conn:
         with conn.cursor() as cur:

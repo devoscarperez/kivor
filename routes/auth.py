@@ -1,5 +1,9 @@
 from services.auth_service import login_user
-from schemas.auth_schema import LoginRequest, LoginUsernameRequest
+from schemas.auth_schema import (
+    LoginRequest,
+    LoginUsernameRequest,
+    LogoutSessionRequest,
+)
 
 from fastapi import APIRouter, HTTPException, Request, Body
 from datetime import datetime, timedelta
@@ -75,14 +79,11 @@ def logout(current_user: dict):
 
 @router.post("/logout-session")
 def logout_session(
-    data: dict = Body(...),
-    current_user: dict = None
+    data: LogoutSessionRequest,
+    current_user: dict = Depends(verify_token)
 ):
 
-    session_id = data.get("session_id")
-
-    if not session_id:
-        raise HTTPException(status_code=400, detail="session_id requerido")
+    session_id = data.session_id
 
     with get_connection() as conn:
         with conn.cursor() as cur:

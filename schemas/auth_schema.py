@@ -7,3 +7,6 @@ class LoginRequest(BaseModel):
 
 class LoginUsernameRequest(BaseModel):
     username: str = Field(..., min_length=3)
+
+class LogoutSessionRequest(BaseModel):
+    session_id: str = Field(..., min_length=1)

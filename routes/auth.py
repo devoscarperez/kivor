@@ -1,4 +1,5 @@
 from services.auth_service import login_user
+from schemas.auth_schema import LoginRequest
 
 from fastapi import APIRouter, HTTPException, Request, Body
 from datetime import datetime, timedelta
@@ -11,10 +12,10 @@ from core.security import create_access_token, get_token_expiration_minutes
 router = APIRouter()
 
 @router.post("/login")
-def login(request: Request, data: dict = Body(...)):
+def login(request: Request, data: LoginRequest):
 
-    username = data.get("username")
-    password = data.get("password")
+    username = data.username
+    password = data.password
 
     if not username or not password:
         raise HTTPException(status_code=400, detail="Usuario y clave requeridos")

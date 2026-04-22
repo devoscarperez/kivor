@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Body
 from core.db import get_connection
 from schemas.user_schema import CreateUserRequest, CreateUserResponse
+from services.user_service import create_user_service
 
 router = APIRouter()
 
@@ -36,8 +37,6 @@ def create_user(data: CreateUserRequest):
     conn.commit()
     cur.close()
     conn.close()
-
-    return {"user_id": user_id}
 
     return create_user_service(data)
 

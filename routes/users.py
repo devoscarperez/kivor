@@ -8,38 +8,36 @@ router = APIRouter()
 @router.post("/users", response_model=CreateUserResponse)
 def create_user(data: CreateUserRequest):
 
-    try:
-        conn = get_connection()
-        cur = conn.cursor()
+    conn = get_connection()
+    cur = conn.cursor()
 
-        cur.execute("""
-            INSERT INTO core."user" (
-                user_nickname,
-                user_name,
-                user_password_hash,
-                user_firstname,
-                user_lastname,
-                user_group_id
-            )
-            VALUES (%s, %s, %s, %s, %s, %s)
-            RETURNING user_id
-        """, (
-            data.user_nickname,
-            data.user_name,
-            data.user_password,
-            data.user_firstname,
-            data.user_lastname,
-            int(data.user_group_id)
-        ))
+    cur.execute("""
+        INSERT INTO core."user" (
+            user_nickname,
+            user_name,
+            user_password_hash,
+            user_firstname,
+            user_lastname,
+            user_group_id
+        )
+        VALUES (%s, %s, %s, %s, %s, %s)
+        RETURNING user_id
+    """, (
+        data.user_nickname,
+        data.user_name,
+        data.user_password,
+        data.user_firstname,
+        data.user_lastname,
+        int(data.user_group_id)
+    ))
 
-        user_id = cur.fetchone()
+    user_id = cur.fetchone()
 
-        conn.commit()
-        cur.close()
-        conn.close()
+    conn.commit()
+    cur.close()
+    conn.close()
 
-        return {"user_id": user_id}
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Error creando usuario")
+    return {"user_id": user_id}
+
+    return create_user_service(data)
 

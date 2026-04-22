@@ -5,7 +5,7 @@ from schemas.auth_schema import (
     LogoutSessionRequest,
 )
 
-from fastapi import APIRouter, HTTPException, Request, Body
+from fastapi import APIRouter, HTTPException, Request, Body, Depends
 from datetime import datetime, timedelta
 from uuid import uuid4
 import hashlib

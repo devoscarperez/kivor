@@ -24,15 +24,13 @@ def login(request: Request, data: LoginRequest):
     if not username or not password:
         raise HTTPException(status_code=400, detail="Usuario y clave requeridos")
 
-    try:
-        return login_user(
-            username,
-            password,
-            request.client.host,
-            request.headers.get("user-agent")
-        )
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=str(e))
+
+    return login_user(
+        username,
+        password,
+        request.client.host,
+        request.headers.get("user-agent")
+    )
 
 
 @router.post("/login-username")

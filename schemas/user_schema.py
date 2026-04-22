@@ -8,3 +8,6 @@ class CreateUserRequest(BaseModel):
     user_firstname: str = Field(..., min_length=2)
     user_lastname: str = Field(..., min_length=2)
     user_group_id: int
+
+class CreateUserResponse(BaseModel):
+    user_id: int

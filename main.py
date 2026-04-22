@@ -10,6 +10,9 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
+from fastapi.responses import JSONResponse
+from core.exceptions import AppException
+
 import os
 
 
@@ -22,6 +25,12 @@ import os
 
 app = FastAPI(title="KIVOR Backend")
 
+@app.exception_handler(AppException)
+async def app_exception_handler(request, exc: AppException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
 
 app.add_middleware(
     CORSMiddleware,

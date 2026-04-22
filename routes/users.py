@@ -39,6 +39,7 @@ def create_user(data: CreateUserRequest):
         conn.close()
 
         return {"user_id": user_id}
-
+        
     except Exception as e:
-        return {"detail": str(e)}
+        raise HTTPException(status_code=500, detail="Error creando usuario")
+

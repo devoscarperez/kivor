@@ -11,7 +11,7 @@ from uuid import uuid4
 import hashlib
 
 from core.db import get_connection
-from core.security import create_access_token, get_token_expiration_minutes
+from core.security import create_access_token, get_token_expiration_minutes,  verify_token
 
 router = APIRouter()
 

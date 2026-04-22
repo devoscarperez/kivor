@@ -4,7 +4,7 @@ import hashlib
 
 from core.db import get_connection
 from core.security import create_access_token, get_token_expiration_minutes
-
+from core.exceptions import UnauthorizedError
 
 def login_user(username: str, password: str, client_ip: str, user_agent: str):
 
@@ -24,7 +24,7 @@ def login_user(username: str, password: str, client_ip: str, user_agent: str):
             user = cur.fetchone()
 
             if not user:
-                raise Exception("Credenciales inválidas")
+                raise UnauthorizedError("Credenciales inválidas")
 
             user_id, stored_password, group_id = user
 
@@ -32,7 +32,8 @@ def login_user(username: str, password: str, client_ip: str, user_agent: str):
             hashed_input = hashlib.sha256(password.encode()).hexdigest()
 
             if hashed_input != stored_password:
-                raise Exception("Credenciales inválidas")
+   
+                raise UnauthorizedError("Credenciales inválidas")
 
             # PERSON
             cur.execute("""

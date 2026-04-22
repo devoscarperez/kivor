@@ -5,7 +5,7 @@ from schemas.user_schema import CreateUserRequest
 router = APIRouter()
 
 
-@router.post("/users")
+@router.post("/users", response_model=CreateUserResponse)
 def create_user(data: CreateUserRequest):
 
     try:

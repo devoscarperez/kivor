@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Body
 from core.db import get_connection
-from schemas.user_schema import CreateUserRequest
+from schemas.user_schema import CreateUserRequest, CreateUserResponse
 
 router = APIRouter()
 

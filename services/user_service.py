@@ -1,5 +1,6 @@
 from core.db import get_connection
 from core.exceptions import InternalServerError
+import hashlib
 
 
 def create_user_service(data):
@@ -7,7 +8,7 @@ def create_user_service(data):
     try:
         with get_connection() as conn:
             with conn.cursor() as cur:
-
+                hashed_password = hashlib.sha256(data.user_password.encode()).hexdigest()
                 cur.execute("""
                     INSERT INTO core."user" (
                         user_nickname,
@@ -22,7 +23,7 @@ def create_user_service(data):
                 """, (
                     data.user_nickname,
                     data.user_name,
-                    data.user_password,
+                    hashed_password,,
                     data.user_firstname,
                     data.user_lastname,
                     int(data.user_group_id)

@@ -23,7 +23,7 @@ def create_user_service(data):
                 """, (
                     data.user_nickname,
                     data.user_name,
-                    hashed_password,,
+                    hashed_password,
                     data.user_firstname,
                     data.user_lastname,
                     int(data.user_group_id)

@@ -150,3 +150,32 @@ def get_nivel2_service(family: str):
             rows = cur.fetchall()
 
     return [r[0] for r in rows]
+
+
+def get_precios_service_GS(
+    family: str,
+    level2: str = None,
+    level3: str = None,
+    level4: str = None
+):
+
+    query = "
+    SELECT family,
+           level2,
+           level3,
+           level4,
+           servicekey,
+           listprice,
+           professionalprice,
+           salonpercentage,
+           professionalpercentage
+    FROM core.prices
+    ORDER BY servicekey"
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, tuple(params))
+            columns = [desc[0] for desc in cur.description]
+            rows = cur.fetchall()
+
+    return [dict(zip(columns, row)) for row in rows]

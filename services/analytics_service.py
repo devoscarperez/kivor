@@ -152,7 +152,7 @@ def get_nivel2_service(family: str):
     return [r[0] for r in rows]
 
 
-def get_precios_service_GS():
+def get_precios_service_GS(family=None):
 
     query = """
     SELECT family,
@@ -165,9 +165,17 @@ def get_precios_service_GS():
            salonpercentage,
            professionalpercentage
     FROM core.prices
-    ORDER BY servicekey
     """
 
+    params = []
+    
+    # 🔥 FILTRO DINÁMICO
+    if family:
+        query += " WHERE family = %s"
+        params.append(family)
+    
+    query += " ORDER BY servicekey"
+    
     try:
         with get_connection() as conn:
             with conn.cursor() as cur:

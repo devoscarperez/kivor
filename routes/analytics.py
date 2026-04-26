@@ -67,6 +67,6 @@ def obtener_precios(
     return get_precios_service(family, level2, level3, level4)
 
 @router.get("/preciosGS")
-def obtener_precios():
-    return get_precios_service_GS()
+def obtener_precios(family: str = None):
+    return get_precios_service_GS(familia)
 

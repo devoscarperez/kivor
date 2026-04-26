@@ -152,12 +152,7 @@ def get_nivel2_service(family: str):
     return [r[0] for r in rows]
 
 
-def get_precios_service_GS(
-    family: str,
-    level2: str = None,
-    level3: str = None,
-    level4: str = None
-):
+def get_precios_service_GS():
 
     query =  """
     SELECT family,

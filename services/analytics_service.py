@@ -168,22 +168,17 @@ def get_precios_service_GS(family=None):
     """
 
     params = []
-    
-    # 🔥 FILTRO DINÁMICO
+
     if family:
         query += " WHERE family = %s"
         params.append(family)
-    
+
     query += " ORDER BY servicekey"
-    
-    try:
-        with get_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute(query)
-                columns = [desc[0] for desc in cur.description]
-                rows = cur.fetchall()
 
-        return [dict(zip(columns, row)) for row in rows]
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, params)  # 🔥 CLAVE
+            columns = [desc[0] for desc in cur.description]
+            rows = cur.fetchall()
 
-    except Exception as e:
-        return {"error": str(e)}  # 🔥 CLAVE
+    return [dict(zip(columns, row)) for row in rows]

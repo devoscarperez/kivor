@@ -174,7 +174,7 @@ def get_precios_service_GS(
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(query, tuple(params))
+            cur.execute(query)
             columns = [desc[0] for desc in cur.description]
             rows = cur.fetchall()
 

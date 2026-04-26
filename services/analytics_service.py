@@ -159,7 +159,7 @@ def get_precios_service_GS(
     level4: str = None
 ):
 
-    query = "
+    query =  """
     SELECT family,
            level2,
            level3,
@@ -170,7 +170,7 @@ def get_precios_service_GS(
            salonpercentage,
            professionalpercentage
     FROM core.prices
-    ORDER BY servicekey"
+    ORDER BY servicekey """
 
     with get_connection() as conn:
         with conn.cursor() as cur:

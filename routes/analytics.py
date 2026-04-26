@@ -70,8 +70,7 @@ def obtener_precios(
     family: str,
     level2: str = None,
     level3: str = None,
-    level4: str = None,
-    current_user: dict = Depends(verify_token)
+    level4: str = None
 ):
 
     return get_precios_service_GS()

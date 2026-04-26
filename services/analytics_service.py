@@ -154,7 +154,7 @@ def get_nivel2_service(family: str):
 
 def get_precios_service_GS():
 
-    query =  """
+    query = """
     SELECT family,
            level2,
            level3,
@@ -165,12 +165,17 @@ def get_precios_service_GS():
            salonpercentage,
            professionalpercentage
     FROM core.prices
-    ORDER BY servicekey """
+    ORDER BY servicekey
+    """
 
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(query)
-            columns = [desc[0] for desc in cur.description]
-            rows = cur.fetchall()
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query)
+                columns = [desc[0] for desc in cur.description]
+                rows = cur.fetchall()
 
-    return [dict(zip(columns, row)) for row in rows]
+        return [dict(zip(columns, row)) for row in rows]
+
+    except Exception as e:
+        return {"error": str(e)}  # 🔥 CLAVE

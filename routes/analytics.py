@@ -7,6 +7,7 @@ from services.analytics_service import (
     get_nivel3_service,
     get_nivel4_service,
     get_precios_service,
+    get_precios_service_GS,
     get_ganancias_por_mes_service
 )
 

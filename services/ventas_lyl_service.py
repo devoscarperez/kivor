@@ -211,12 +211,12 @@ async def upload_ventas_service(
 
     except Exception as e:
         raise Exception(f"Error cargando ventas: {str(e)}")
-return {
-    "success": True,
-    "anio": anio,
-    "mes": mes,
-    "anio_mes": anio_mes,
-    "rows_deleted": rows_deleted,
-    "rows_inserted": len(df),
-    "message": "Carga realizada correctamente"
-}
+    return {
+        "success": True,
+        "anio": anio,
+        "mes": mes,
+        "anio_mes": anio_mes,
+        "rows_deleted": rows_deleted,
+        "rows_inserted": len(df),
+        "message": "Carga realizada correctamente"
+    }

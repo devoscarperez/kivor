@@ -5,6 +5,7 @@ from routes import customers_express
 from routes import users
 from routes import analytics
 from routes import menu
+from routes import ventas_lyl
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware

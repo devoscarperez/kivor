@@ -3,3 +3,6 @@ uvicorn[standard]==0.34.0
 psycopg[binary]==3.3.2
 python-jose[cryptography]==3.3.0
 bcrypt
+pandas
+openpyxl
+python-multipart

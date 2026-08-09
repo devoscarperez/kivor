@@ -1,5 +1,6 @@
 # services/ventas_lyl_service.py
 
+from typing import Optional
 import pandas as pd
 from fastapi import UploadFile
 from core.db import get_connection
@@ -82,12 +83,16 @@ def validate_columns(df: pd.DataFrame):
         raise Exception(f"Faltan columnas obligatorias en el Excel: {', '.join(missing)}")
 
 
-def filter_period(df: pd.DataFrame, anio: int, mes: int) -> pd.DataFrame:
+def filter_period(df: pd.DataFrame, anio: int, mes: Optional[int] = None) -> pd.DataFrame:
     anio_text = str(anio)
-    anio_mes = f"{anio}-{str(mes).zfill(2)}"
 
     df["AÑO"] = df["AÑO"].apply(clean_value)
     df["AÑO-MES"] = df["AÑO-MES"].apply(clean_value)
+
+    if mes is None:
+        return df[df["AÑO"] == anio_text].copy()
+
+    anio_mes = f"{anio}-{str(mes).zfill(2)}"
 
     df_filtered = df[
         (df["AÑO"] == anio_text) &
@@ -118,15 +123,21 @@ def build_insert_rows(df: pd.DataFrame, archivo_origen: str):
     return rows
 
 
-def delete_period(cur, anio: int, anio_mes: str) -> int:
-    cur.execute(
-        """
-        DELETE FROM core.stg_ventas_lyl
-        WHERE anio = %s
-        AND anio_mes = %s
-        """,
-        (str(anio), anio_mes)
-    )
+def delete_period(cur, anio: int, anio_mes: Optional[str] = None) -> int:
+    if anio_mes is None:
+        cur.execute(
+            "DELETE FROM core.stg_ventas_lyl WHERE anio = %s",
+            (str(anio),)
+        )
+    else:
+        cur.execute(
+            """
+            DELETE FROM core.stg_ventas_lyl
+            WHERE anio = %s
+            AND anio_mes = %s
+            """,
+            (str(anio), anio_mes)
+        )
 
     return cur.rowcount
 
@@ -165,14 +176,15 @@ def insert_dataframe_ventas(cur, rows: list) -> int:
 
 async def upload_ventas_service(
     anio: int,
-    mes: int,
+    mes: Optional[int],
     file: UploadFile,
     current_user: dict
 ):
-    if mes < 1 or mes > 12:
+    if mes is not None and (mes < 1 or mes > 12):
         raise Exception("Mes inválido. Debe estar entre 1 y 12.")
 
-    anio_mes = f"{anio}-{str(mes).zfill(2)}"
+    anio_mes = f"{anio}-{str(mes).zfill(2)}" if mes is not None else None
+    periodo_label = anio_mes if anio_mes else str(anio)
 
     try:
         df = pd.read_excel(
@@ -188,7 +200,7 @@ async def upload_ventas_service(
         df_filtered = filter_period(df, anio, mes)
 
         if df_filtered.empty:
-            raise Exception(f"No existen registros para el período {anio_mes} en el Excel.")
+            raise Exception(f"No existen registros para el período {periodo_label} en el Excel.")
 
         rows = build_insert_rows(df_filtered, file.filename)
 
@@ -211,12 +223,3 @@ async def upload_ventas_service(
 
     except Exception as e:
         raise Exception(f"Error cargando ventas: {str(e)}")
-    return {
-        "success": True,
-        "anio": anio,
-        "mes": mes,
-        "anio_mes": anio_mes,
-        "rows_deleted": rows_deleted,
-        "rows_inserted": len(df),
-        "message": "Carga realizada correctamente"
-    }

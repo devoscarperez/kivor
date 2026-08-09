@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
 from core.security import verify_token
 from services.ventas_lyl_service import upload_ventas_service
@@ -9,7 +10,7 @@ router = APIRouter(prefix="/ventas-lyl", tags=["Ventas LYL"])
 @router.post("/upload", response_model=UploadVentasResponse)
 async def upload_ventas(
     anio: int = Form(...),
-    mes: int = Form(...),
+    mes: Optional[int] = Form(None),
     file: UploadFile = File(...),
     current_user: dict = Depends(verify_token)
 ):

@@ -1,6 +1,7 @@
 # services/ventas_lyl_service.py
 
 from typing import Optional
+from datetime import datetime
 import pandas as pd
 from fastapi import UploadFile
 from core.db import get_connection
@@ -10,7 +11,6 @@ EXCEL_SHEET_NAME = "VENTAS"
 
 
 COLUMN_MAP = {
-    "VENTAS_KEY": "ventas_key",
     "SP": "sp",
     "FECHA ENTREGA": "fecha_entrega",
     "PROFESIONAL": "profesional",
@@ -46,9 +46,19 @@ COLUMN_MAP = {
 
 
 REQUIRED_COLUMNS = [
-    "VENTAS_KEY",
     "AÑO",
     "AÑO-MES",
+    "RUT / CELULAR",
+    "FECHA ENTREGA",
+]
+
+
+DATE_FORMATS = [
+    "%d-%m-%Y",
+    "%d/%m/%Y",
+    "%Y-%m-%d",
+    "%d-%m-%Y %H:%M:%S",
+    "%Y-%m-%d %H:%M:%S",
 ]
 
 
@@ -83,6 +93,46 @@ def validate_columns(df: pd.DataFrame):
         raise Exception(f"Faltan columnas obligatorias en el Excel: {', '.join(missing)}")
 
 
+def parse_fecha_entrega(value) -> Optional[datetime]:
+    if not value:
+        return None
+
+    for fmt in DATE_FORMATS:
+        try:
+            return datetime.strptime(value, fmt)
+        except ValueError:
+            continue
+
+    return None
+
+
+def build_ventas_key(rut_celular: str, fecha_entrega: datetime, correlativo: int) -> str:
+    mes = str(fecha_entrega.month).zfill(2)
+    dia = str(fecha_entrega.day).zfill(2)
+
+    return f"{rut_celular}-{mes}{dia}-{correlativo}"
+
+
+def validate_ventas_key_inputs(df: pd.DataFrame):
+    errors = []
+
+    for index, row in df.iterrows():
+        fila_excel = int(index) + 2
+
+        rut_celular = clean_value(row.get("RUT / CELULAR"))
+        if not rut_celular:
+            errors.append(f"Fila {fila_excel}: RUT / CELULAR vacío o inválido.")
+
+        fecha_entrega_raw = clean_value(row.get("FECHA ENTREGA"))
+        if not fecha_entrega_raw or parse_fecha_entrega(fecha_entrega_raw) is None:
+            errors.append(f"Fila {fila_excel}: FECHA ENTREGA vacía o con formato inválido.")
+
+    if errors:
+        raise Exception(
+            "No se puede procesar el archivo. Errores encontrados:\n" + "\n".join(errors)
+        )
+
+
 def filter_period(df: pd.DataFrame, anio: int, mes: Optional[int] = None) -> pd.DataFrame:
     anio_text = str(anio)
 
@@ -104,8 +154,10 @@ def filter_period(df: pd.DataFrame, anio: int, mes: Optional[int] = None) -> pd.
 
 def build_insert_rows(df: pd.DataFrame, archivo_origen: str):
     rows = []
+    correlativo = 0
 
     for index, row in df.iterrows():
+        correlativo += 1
         record = {}
 
         for excel_col, db_col in COLUMN_MAP.items():
@@ -113,6 +165,11 @@ def build_insert_rows(df: pd.DataFrame, archivo_origen: str):
                 record[db_col] = clean_value(row[excel_col])
             else:
                 record[db_col] = None
+
+        rut_celular = clean_value(row.get("RUT / CELULAR"))
+        fecha_entrega = parse_fecha_entrega(clean_value(row.get("FECHA ENTREGA")))
+
+        record["ventas_key"] = build_ventas_key(rut_celular, fecha_entrega, correlativo)
 
         record["archivo_origen"] = archivo_origen
         record["hoja_origen"] = EXCEL_SHEET_NAME
@@ -147,6 +204,7 @@ def insert_dataframe_ventas(cur, rows: list) -> int:
         return 0
 
     db_columns = list(COLUMN_MAP.values()) + [
+        "ventas_key",
         "archivo_origen",
         "hoja_origen",
         "fila_excel",
@@ -201,6 +259,8 @@ async def upload_ventas_service(
 
         if df_filtered.empty:
             raise Exception(f"No existen registros para el período {periodo_label} en el Excel.")
+
+        validate_ventas_key_inputs(df_filtered)
 
         rows = build_insert_rows(df_filtered, file.filename)
 

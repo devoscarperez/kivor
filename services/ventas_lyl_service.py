@@ -62,6 +62,9 @@ DATE_FORMATS = [
 ]
 
 
+DEFAULT_RUT_CELULAR = "999"
+
+
 def clean_value(value):
     if pd.isna(value):
         return None
@@ -119,10 +122,6 @@ def validate_ventas_key_inputs(df: pd.DataFrame):
     for index, row in df.iterrows():
         fila_excel = int(index) + 2
 
-        rut_celular = clean_value(row.get("RUT / CELULAR"))
-        if not rut_celular:
-            errors.append(f"Fila {fila_excel}: RUT / CELULAR vacío o inválido.")
-
         fecha_entrega_raw = clean_value(row.get("FECHA ENTREGA"))
         if not fecha_entrega_raw or parse_fecha_entrega(fecha_entrega_raw) is None:
             errors.append(f"Fila {fila_excel}: FECHA ENTREGA vacía o con formato inválido.")
@@ -166,7 +165,9 @@ def build_insert_rows(df: pd.DataFrame, archivo_origen: str):
             else:
                 record[db_col] = None
 
-        rut_celular = clean_value(row.get("RUT / CELULAR"))
+        rut_celular = clean_value(row.get("RUT / CELULAR")) or DEFAULT_RUT_CELULAR
+        record["rut_celular"] = rut_celular
+
         fecha_entrega = parse_fecha_entrega(clean_value(row.get("FECHA ENTREGA")))
 
         record["ventas_key"] = build_ventas_key(rut_celular, fecha_entrega, correlativo)

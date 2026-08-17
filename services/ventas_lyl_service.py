@@ -284,3 +284,124 @@ async def upload_ventas_service(
 
     except Exception as e:
         raise Exception(f"Error cargando ventas: {str(e)}")
+
+
+# ============================================================
+# REPORTE COMPARATIVO DE VENTAS (Año 1 vs Año 2)
+# ============================================================
+
+METRICAS_REPORTE = {
+    "ganancia_salon": "ganancia_salon",
+    "ganancia_prof": "ganancia_prof",
+    "precio_web": "precio_web",
+}
+
+MESES_REPORTE = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+
+
+def get_anios_disponibles_service():
+    query = """
+        SELECT DISTINCT EXTRACT(YEAR FROM fecha_entrega)::int AS anio
+        FROM core.stg_ventas_lyl
+        WHERE fecha_entrega IS NOT NULL
+        ORDER BY anio;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query)
+            rows = cur.fetchall()
+
+    return [r[0] for r in rows]
+
+
+def get_familias_reporte_service():
+    query = """
+        SELECT service_template_code
+        FROM core.service
+        WHERE service_template_code IS NOT NULL;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query)
+            rows = cur.fetchall()
+
+    return [r[0] for r in rows]
+
+
+def get_profesionales_reporte_service():
+    query = """
+        SELECT professional_nickname
+        FROM core.professional
+        WHERE professional_nickname IS NOT NULL
+        ORDER BY professional_nickname ASC;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query)
+            rows = cur.fetchall()
+
+    return [r[0] for r in rows]
+
+
+def get_reporte_ventas_service(
+    anio1: int,
+    anio2: int,
+    metrica: str,
+    familias: Optional[list] = None,
+    profesionales: Optional[list] = None,
+):
+    if metrica not in METRICAS_REPORTE:
+        raise Exception(f"Métrica inválida: {metrica}")
+
+    columna_metrica = METRICAS_REPORTE[metrica]
+
+    condiciones = ["EXTRACT(YEAR FROM fecha_entrega) IN (%s, %s)"]
+    params = [anio1, anio2]
+
+    if familias:
+        condiciones.append("familia = ANY(%s)")
+        params.append(familias)
+
+    if profesionales:
+        condiciones.append("profesional = ANY(%s)")
+        params.append(profesionales)
+
+    where_sql = " AND ".join(condiciones)
+
+    query = f"""
+        SELECT
+            EXTRACT(YEAR FROM fecha_entrega)::int AS anio,
+            EXTRACT(MONTH FROM fecha_entrega)::int AS mes,
+            SUM({columna_metrica}) AS valor
+        FROM core.stg_ventas_lyl
+        WHERE {where_sql}
+        GROUP BY 1, 2
+        ORDER BY 1, 2;
+    """
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, tuple(params))
+            rows = cur.fetchall()
+
+    valores_anio1 = [None] * 12
+    valores_anio2 = [None] * 12
+
+    for anio, mes, valor in rows:
+        valor = float(valor) if valor is not None else None
+        if anio == anio1:
+            valores_anio1[mes - 1] = valor
+        elif anio == anio2:
+            valores_anio2[mes - 1] = valor
+
+    return {
+        "anio1": anio1,
+        "anio2": anio2,
+        "metrica": metrica,
+        "meses": MESES_REPORTE,
+        "valores_anio1": valores_anio1,
+        "valores_anio2": valores_anio2,
+    }

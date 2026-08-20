@@ -172,7 +172,7 @@ def process_whatsapp_message(payload: dict) -> dict:
             "customer_name": "",
             "should_create_customer": False,
             "next_state": next_state,
-            "reply": f"{saludo} Qué gusto volver a conversar contigo.\n\n¿Qué servicio te gustaría realizarte?"
+            "reply": f"{saludo} Qué gusto volver a conversar contigo. ¿Qué servicio te gustaría realizarte?"
         }
 
     # Caso 3: cliente nuevo sin estado previo
@@ -185,5 +185,5 @@ def process_whatsapp_message(payload: dict) -> dict:
         "customer_name": "",
         "should_create_customer": False,
         "next_state": next_state,
-        "reply": "Hola 😊 Gracias por escribir a Lindas y Lunáticas.\n\nAntes de continuar, ¿me puedes indicar tu nombre y apellido?"
+        "reply": "Hola 😊 Gracias por escribir a Lindas y Lunáticas. Antes de continuar, ¿me puedes indicar tu nombre y apellido?"
     }

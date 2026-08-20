@@ -14,6 +14,9 @@ from fastapi.responses import Response
 from fastapi.responses import JSONResponse
 from core.exceptions import AppException
 
+from pydantic import BaseModel
+from typing import Optional
+
 import os
 
 
@@ -22,7 +25,13 @@ import os
 # MODELOS
 # =========================
 
-
+class WhatsAppBrainRequest(BaseModel):
+    phone: str
+    whatsapp_name: Optional[str] = None
+    message: str
+    current_state: Optional[str] = ""
+    customer_exists: bool = False
+    customer_first_name: Optional[str] = ""
 
 app = FastAPI(title="KIVOR Backend")
 
@@ -54,6 +63,7 @@ app.include_router(menu.router)
 @app.options("/{full_path:path}")
 def options_handler(full_path: str):
     return Response(status_code=200)
+
 
 
 # =========================
@@ -131,4 +141,66 @@ def test_db():
         raise HTTPException(status_code=500, detail=str(e))
         
 
+@app.post("/whatsapp/brain")
+def whatsapp_brain(data: WhatsAppBrainRequest):
+    message = data.message.strip()
+    message_lower = message.lower()
 
+    # Caso 1: estamos esperando nombre
+    if data.current_state == "ESPERANDO_NOMBRE":
+        palabras_bloqueadas = [
+            "servicio", "servicios", "precio", "precios",
+            "horario", "hora", "agendar", "agenda",
+            "corte", "color", "manicure", "balayage",
+            "alisado", "tratamiento", "tintura", "mechas",
+            "quiero", "necesito", "consulta", "consultar",
+            "?", "cuánto", "cuanto", "qué", "que"
+        ]
+
+        parece_consulta = any(palabra in message_lower for palabra in palabras_bloqueadas)
+        cantidad_palabras = len(message.split())
+
+        if cantidad_palabras >= 2 and not parece_consulta:
+            primer_nombre = message.split()[0]
+
+            return {
+                "intent": "entrega_nombre",
+                "is_name": True,
+                "customer_name": message,
+                "should_create_customer": True,
+                "next_state": "ESPERANDO_SERVICIO",
+                "reply": f"Gracias {primer_nombre} 😊 ¿Qué servicio te gustaría realizarte?"
+            }
+
+        return {
+            "intent": "no_entrega_nombre",
+            "is_name": False,
+            "customer_name": "",
+            "should_create_customer": False,
+            "next_state": "ESPERANDO_NOMBRE",
+            "reply": "Claro 😊 Te puedo ayudar con eso. Antes de continuar, ¿me puedes indicar tu nombre y apellido?"
+        }
+
+    # Caso 2: clienta ya existe
+    if data.customer_exists:
+        nombre = data.customer_first_name or data.whatsapp_name or ""
+        saludo = f"Hola {nombre} 😊" if nombre else "Hola 😊"
+
+        return {
+            "intent": "inicio_cliente_existente",
+            "is_name": False,
+            "customer_name": "",
+            "should_create_customer": False,
+            "next_state": "ESPERANDO_SERVICIO",
+            "reply": f"{saludo} Qué gusto volver a conversar contigo.\n\n¿Qué servicio te gustaría realizarte?"
+        }
+
+    # Caso 3: clienta nueva sin estado previo
+    return {
+        "intent": "inicio_cliente_nueva",
+        "is_name": False,
+        "customer_name": "",
+        "should_create_customer": False,
+        "next_state": "ESPERANDO_NOMBRE",
+        "reply": "Hola 😊 Gracias por escribir a Lindas y Lunáticas.\n\nAntes de continuar, ¿me puedes indicar tu nombre y apellido?"
+    }

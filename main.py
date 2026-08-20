@@ -17,21 +17,9 @@ from fastapi.responses import JSONResponse
 from core.exceptions import AppException
 
 
-
-
-
 import os
 
-
-
-# =========================
-# MODELOS
-# =========================
-
-
 app = FastAPI(title="KIVOR Backend")
-
-
 
 
 @app.exception_handler(AppException)

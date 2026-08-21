@@ -109,6 +109,47 @@ def message_looks_like_name(message: str) -> bool:
 
     return len(message_clean.split()) >= 2
 
+def build_service_family_list_reply() -> dict:
+    return {
+        "message_type": "interactive_list",
+        "reply": "Perfecto 😊 Elige el tipo de servicio que te gustaría realizarte.",
+        "list_button": "Ver servicios",
+        "sections": [
+            {
+                "title": "Servicios",
+                "rows": [
+                    {
+                        "id": "CABELLO",
+                        "title": "Cabello"
+                    },
+                    {
+                        "id": "MANOS_Y_PIES",
+                        "title": "Manos y pies"
+                    },
+                    {
+                        "id": "FACIALES",
+                        "title": "Faciales"
+                    },
+                    {
+                        "id": "CORPORAL",
+                        "title": "Corporal"
+                    },
+                    {
+                        "id": "CEJAS_Y_PESTANAS",
+                        "title": "Cejas y pestañas"
+                    },
+                    {
+                        "id": "DEPILACION",
+                        "title": "Depilación"
+                    },
+                    {
+                        "id": "ACADEMIA",
+                        "title": "Academia"
+                    }
+                ]
+            }
+        ]
+    }
 
 def process_whatsapp_message(payload: dict) -> dict:
     phone = payload.get("phone", "").strip()
@@ -166,13 +207,16 @@ def process_whatsapp_message(payload: dict) -> dict:
         next_state = "ESPERANDO_SERVICIO"
         save_whatsapp_state(phone, next_state, message)
 
+        service_reply = build_service_family_list_reply()
+        service_reply["reply"] = f"{saludo} Qué gusto volver a conversar contigo. Elige el tipo de servicio que te gustaría realizarte."
+
         return {
             "intent": "inicio_cliente_existente",
             "is_name": False,
             "customer_name": "",
             "should_create_customer": False,
             "next_state": next_state,
-            "reply": f"{saludo} Qué gusto volver a conversar contigo. \n \n ¿Qué servicio te gustaría realizarte?"
+            **service_reply
         }
 
     # Caso 3: cliente nuevo sin estado previo

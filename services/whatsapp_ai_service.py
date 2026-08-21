@@ -1,8 +1,30 @@
 from typing import Optional
 from core.db import get_connection
-
+import json
 
 TENANT_SCHEMA = "lindasylunaticas"
+
+import json
+
+
+def build_whatsapp_interactive_list_payload(phone: str, reply: str, list_button: str, sections: list) -> str:
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": phone,
+        "type": "interactive",
+        "interactive": {
+            "type": "list",
+            "body": {
+                "text": reply
+            },
+            "action": {
+                "button": list_button,
+                "sections": sections
+            }
+        }
+    }
+
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def get_whatsapp_state(phone: str) -> str:
@@ -178,13 +200,24 @@ def process_whatsapp_message(payload: dict) -> dict:
             next_state = "ESPERANDO_SERVICIO"
             save_whatsapp_state(phone, next_state, message)
 
+            service_reply = build_service_family_list_reply()
+            service_reply["reply"] = f"Gracias {first_name} 😊 Elige el tipo de servicio que te gustaría realizarte."
+
+            whatsapp_payload_json = build_whatsapp_interactive_list_payload(
+                phone=phone,
+                reply=service_reply["reply"],
+                list_button=service_reply["list_button"],
+                sections=service_reply["sections"]
+            )
+
             return {
                 "intent": "entrega_nombre",
                 "is_name": True,
                 "customer_name": message,
                 "should_create_customer": True,
                 "next_state": next_state,
-                "reply": f"Gracias {first_name} 😊 ¿Qué servicio te gustaría realizarte?"
+                **service_reply,
+                "whatsapp_payload_json": whatsapp_payload_json
             }
 
         next_state = "ESPERANDO_NOMBRE"
@@ -196,6 +229,7 @@ def process_whatsapp_message(payload: dict) -> dict:
             "customer_name": "",
             "should_create_customer": False,
             "next_state": next_state,
+            "message_type": "text",
             "reply": "Claro 😊 Te puedo ayudar con eso. Antes de continuar, ¿me puedes indicar tu nombre y apellido?"
         }
 
@@ -210,15 +244,22 @@ def process_whatsapp_message(payload: dict) -> dict:
         service_reply = build_service_family_list_reply()
         service_reply["reply"] = f"{saludo} Qué gusto volver a conversar contigo. Elige el tipo de servicio que te gustaría realizarte."
 
+        whatsapp_payload_json = build_whatsapp_interactive_list_payload(
+            phone=phone,
+            reply=service_reply["reply"],
+            list_button=service_reply["list_button"],
+            sections=service_reply["sections"]
+        )
+
         return {
             "intent": "inicio_cliente_existente",
             "is_name": False,
             "customer_name": "",
             "should_create_customer": False,
             "next_state": next_state,
-            **service_reply
+            **service_reply,
+            "whatsapp_payload_json": whatsapp_payload_json
         }
-
     # Caso 3: cliente nuevo sin estado previo
     next_state = "ESPERANDO_NOMBRE"
     save_whatsapp_state(phone, next_state, message)

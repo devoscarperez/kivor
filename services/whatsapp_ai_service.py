@@ -1,7 +1,6 @@
 import json
 import re
 from typing import Optional
-from uuid import uuid4
 
 from psycopg.types.json import Jsonb
 
@@ -211,25 +210,23 @@ def get_customer_by_mobile(phone: str) -> dict:
 
 def create_customer_from_whatsapp(phone: str, whatsapp_name: str) -> dict:
     display_name = whatsapp_name.strip() if whatsapp_name else "Clienta WhatsApp"
-    customer_uuid = str(uuid4())
 
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 f"""
                 INSERT INTO {TENANT_SCHEMA}.customers_express (
-                    customers_express_uuid,
                     customers_express_mobile,
                     customers_express_first_name,
                     customers_express_full_search,
                     customers_express_status,
                     customers_express_link_status
                 )
-                VALUES (%s, %s, %s, %s, 'ACTIVE', 'WHATSAPP_AI')
+                VALUES (%s, %s, %s, 'ACTIVE', 'WHATSAPP_AI')
                 ON CONFLICT DO NOTHING
                 RETURNING customers_express_uuid, customers_express_first_name
                 """,
-                (customer_uuid, phone, display_name, display_name)
+                (phone, display_name, display_name)
             )
             row = cur.fetchone()
 

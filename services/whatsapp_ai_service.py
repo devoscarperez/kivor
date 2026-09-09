@@ -1,6 +1,7 @@
 import json
 import re
 from typing import Optional
+from uuid import uuid4
 
 from psycopg.types.json import Jsonb
 
@@ -192,7 +193,7 @@ def get_customer_by_mobile(phone: str) -> dict:
             cur.execute(
                 f"""
                 SELECT
-                    customers_express_id,
+                    customers_express_uuid,
                     customers_express_first_name
                 FROM {TENANT_SCHEMA}.customers_express
                 WHERE customers_express_mobile = %s
@@ -205,33 +206,35 @@ def get_customer_by_mobile(phone: str) -> dict:
     if not row:
         return {"customer_exists": False, "customer_id": None, "customer_name": ""}
 
-    return {"customer_exists": True, "customer_id": row[0], "customer_name": row[1] or ""}
+    return {"customer_exists": True, "customer_id": row[0] or None, "customer_name": row[1] or ""}
 
 
 def create_customer_from_whatsapp(phone: str, whatsapp_name: str) -> dict:
     display_name = whatsapp_name.strip() if whatsapp_name else "Clienta WhatsApp"
+    customer_uuid = str(uuid4())
 
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
                 f"""
                 INSERT INTO {TENANT_SCHEMA}.customers_express (
+                    customers_express_uuid,
                     customers_express_mobile,
                     customers_express_first_name,
                     customers_express_full_search,
                     customers_express_status,
                     customers_express_link_status
                 )
-                VALUES (%s, %s, %s, 'ACTIVE', 'WHATSAPP_AI')
+                VALUES (%s, %s, %s, %s, 'ACTIVE', 'WHATSAPP_AI')
                 ON CONFLICT DO NOTHING
-                RETURNING customers_express_id, customers_express_first_name
+                RETURNING customers_express_uuid, customers_express_first_name
                 """,
-                (phone, display_name, display_name)
+                (customer_uuid, phone, display_name, display_name)
             )
             row = cur.fetchone()
 
     if row:
-        return {"customer_id": row[0], "customer_name": row[1] or display_name}
+        return {"customer_id": row[0] or None, "customer_name": row[1] or display_name}
 
     return get_customer_by_mobile(phone)
 

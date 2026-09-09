@@ -192,7 +192,7 @@ def get_customer_by_mobile(phone: str) -> dict:
             cur.execute(
                 f"""
                 SELECT
-                    customers_express_id,
+                    customers_express_uuid,
                     customers_express_first_name
                 FROM {TENANT_SCHEMA}.customers_express
                 WHERE customers_express_mobile = %s
@@ -205,7 +205,7 @@ def get_customer_by_mobile(phone: str) -> dict:
     if not row:
         return {"customer_exists": False, "customer_id": None, "customer_name": ""}
 
-    return {"customer_exists": True, "customer_id": row[0], "customer_name": row[1] or ""}
+    return {"customer_exists": True, "customer_id": row[0] or None, "customer_name": row[1] or ""}
 
 
 def create_customer_from_whatsapp(phone: str, whatsapp_name: str) -> dict:
@@ -224,14 +224,14 @@ def create_customer_from_whatsapp(phone: str, whatsapp_name: str) -> dict:
                 )
                 VALUES (%s, %s, %s, 'ACTIVE', 'WHATSAPP_AI')
                 ON CONFLICT DO NOTHING
-                RETURNING customers_express_id, customers_express_first_name
+                RETURNING customers_express_uuid, customers_express_first_name
                 """,
                 (phone, display_name, display_name)
             )
             row = cur.fetchone()
 
     if row:
-        return {"customer_id": row[0], "customer_name": row[1] or display_name}
+        return {"customer_id": row[0] or None, "customer_name": row[1] or display_name}
 
     return get_customer_by_mobile(phone)
 

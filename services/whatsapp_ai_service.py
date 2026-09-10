@@ -30,7 +30,7 @@ FAMILIA_SERVICIO_LABELS = {
     "MAQUILLAJE": "Maquillaje",
     "CEJAS_O_PESTANAS": "Cejas o pestañas",
     "ASESORIA_IMAGEN": "Asesoría de imagen",
-    "LO_MISMO": "Lo mismo que me realizo siempre",
+    "LO_MISMO": "Lo mismo de siempre",
 }
 
 FAMILIA_SERVICIO_PROMPTS = {
@@ -71,7 +71,7 @@ CONFIRMACION_MAS_SERVICIOS_LABELS = {
 
 POST_PRECIO_LABELS = {
     "AGENDAR": "Quiero agendar",
-    "TENGO_DUDAS": "Tengo dudas o necesito asesoría",
+    "TENGO_DUDAS": "Tengo dudas o asesoría",
     "NADA_MAS": "Por ahora nada más",
 }
 

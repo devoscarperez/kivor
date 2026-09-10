@@ -7,6 +7,7 @@ from routes import analytics
 from routes import menu
 from routes import ventas_lyl
 from routes import whatsapp_ai
+from routes import whatsapp_inbox
 
 
 from fastapi import FastAPI, HTTPException
@@ -47,6 +48,7 @@ app.include_router(users.router)
 app.include_router(analytics.router)
 app.include_router(menu.router)
 app.include_router(whatsapp_ai.router)
+app.include_router(whatsapp_inbox.router)
 
 @app.options("/{full_path:path}")
 def options_handler(full_path: str):

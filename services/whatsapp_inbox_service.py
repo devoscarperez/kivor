@@ -7,7 +7,7 @@ CONTROL_STATES_PENDIENTES = ("EN_MANO_HUMANA", "FICHA_LISTA")
 INBOX_LIST_COLUMNS = [
     "phone", "whatsapp_name", "customer_name", "state", "control_state",
     "intent", "service_family", "assigned_to", "last_customer_message",
-    "last_customer_message_at", "window_expires_at", "updated_at",
+    "last_customer_message_at", "window_expires_at", "created_at", "updated_at",
 ]
 
 INBOX_DETAIL_COLUMNS = [

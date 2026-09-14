@@ -346,12 +346,25 @@ def get_profesionales_reporte_service():
     return [r[0] for r in rows]
 
 
+QUINCENA_SQL = """
+    CASE
+        WHEN EXTRACT(DAY FROM fecha_entrega) <= FLOOR(
+            EXTRACT(DAY FROM (date_trunc('month', fecha_entrega) + interval '1 month - 1 day')) / 2
+        )
+        THEN 1
+        ELSE 2
+    END
+"""
+
+
 def get_reporte_ventas_service(
     anio1: int,
     anio2: int,
     metrica: str,
     familias: Optional[list] = None,
     profesionales: Optional[list] = None,
+    dias_semana: Optional[list] = None,
+    quincenas: Optional[list] = None,
 ):
     if metrica not in METRICAS_REPORTE:
         raise Exception(f"Métrica inválida: {metrica}")
@@ -368,6 +381,14 @@ def get_reporte_ventas_service(
     if profesionales:
         condiciones.append("profesional = ANY(%s)")
         params.append(profesionales)
+
+    if dias_semana:
+        condiciones.append("EXTRACT(ISODOW FROM fecha_entrega)::int = ANY(%s)")
+        params.append(dias_semana)
+
+    if quincenas:
+        condiciones.append(f"({QUINCENA_SQL}) = ANY(%s)")
+        params.append(quincenas)
 
     where_sql = " AND ".join(condiciones)
 

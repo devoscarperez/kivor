@@ -48,9 +48,13 @@ def obtener_reporte_ventas(
     metrica: Literal["ganancia_salon", "ganancia_prof", "precio_web"],
     familias: Optional[List[str]] = Query(None),
     profesionales: Optional[List[str]] = Query(None),
+    dias_semana: Optional[List[int]] = Query(None),
+    quincenas: Optional[List[int]] = Query(None),
     current_user: dict = Depends(verify_token)
 ):
     try:
-        return get_reporte_ventas_service(anio1, anio2, metrica, familias, profesionales)
+        return get_reporte_ventas_service(
+            anio1, anio2, metrica, familias, profesionales, dias_semana, quincenas
+        )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -429,7 +429,7 @@ def get_reporte_ventas_service(
 
 
 # ============================================================
-# REPORTE DE KPIs (Ticket promedio, clientas nuevas, servicios,
+# REPORTE DE KPIs (Ticket promedio, clientas nuevas,
 # cross-selling y ABC de familias)
 # ============================================================
 
@@ -565,35 +565,21 @@ def _calcular_clientas_nuevas(cur, anio1, anio2, familias, profesionales, dias_s
     return _serie_mensual(filas, anio1, anio2, valor_default=0)
 
 
-def _calcular_servicios(cur, anio1, anio2, familias, profesionales, dias_semana, quincenas):
-    condiciones, params_extra = _condiciones_filtros(familias, profesionales, dias_semana, quincenas)
-    condiciones = ["EXTRACT(YEAR FROM fecha_entrega) IN (%s, %s)"] + condiciones
-    params = [anio1, anio2] + params_extra
-    where_sql = " AND ".join(condiciones)
-
-    cur.execute(f"""
-        SELECT EXTRACT(YEAR FROM fecha_entrega)::int AS anio,
-               EXTRACT(MONTH FROM fecha_entrega)::int AS mes,
-               COUNT(*) AS cantidad
-        FROM core.stg_ventas_lyl
-        WHERE {where_sql}
-        GROUP BY 1, 2
-    """, tuple(params))
-
-    filas = [(anio, mes, int(cantidad)) for anio, mes, cantidad in cur.fetchall()]
-    return _serie_mensual(filas, anio1, anio2, valor_default=0)
-
-
 def _calcular_cross_selling_anio(cur, anio, profesionales, dias_semana, quincenas):
     condiciones, params_extra = _condiciones_filtros(
         profesionales=profesionales, dias_semana=dias_semana, quincenas=quincenas, incluir_familia=False
     )
-    condiciones = ["EXTRACT(YEAR FROM fecha_entrega) = %s", "familia IS NOT NULL"] + condiciones
+    condiciones = [
+        "EXTRACT(YEAR FROM fecha_entrega) = %s",
+        "familia IS NOT NULL",
+        "rut_celular IS NOT NULL",
+        "TRIM(rut_celular) <> ''",
+    ] + condiciones
     params = [anio] + params_extra
     where_sql = " AND ".join(condiciones)
 
     cur.execute(f"""
-        SELECT DISTINCT familia, rut_celular
+        SELECT DISTINCT familia, TRIM(rut_celular) AS rut_celular
         FROM core.stg_ventas_lyl
         WHERE {where_sql}
     """, tuple(params))
@@ -674,9 +660,6 @@ def get_reporte_kpis_service(
             clientas_nuevas_anio1, clientas_nuevas_anio2 = _calcular_clientas_nuevas(
                 cur, anio1, anio2, familias, profesionales, dias_semana, quincenas
             )
-            servicios_anio1, servicios_anio2 = _calcular_servicios(
-                cur, anio1, anio2, familias, profesionales, dias_semana, quincenas
-            )
             cross_selling_anio1 = _calcular_cross_selling_anio(cur, anio1, profesionales, dias_semana, quincenas)
             cross_selling_anio2 = _calcular_cross_selling_anio(cur, anio2, profesionales, dias_semana, quincenas)
             abc_anio1 = _calcular_abc_familias_anio(cur, anio1, profesionales, dias_semana, quincenas)
@@ -695,8 +678,6 @@ def get_reporte_kpis_service(
         "ticket_anual_anio2": ticket["anual_anio2"],
         "clientas_nuevas_anio1": clientas_nuevas_anio1,
         "clientas_nuevas_anio2": clientas_nuevas_anio2,
-        "servicios_anio1": servicios_anio1,
-        "servicios_anio2": servicios_anio2,
         "cross_selling_anio1": cross_selling_anio1,
         "cross_selling_anio2": cross_selling_anio2,
         "abc_anio1": abc_anio1,

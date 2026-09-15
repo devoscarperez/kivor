@@ -15,6 +15,11 @@ TENANT_SCHEMA = "lindasylunaticas"
 PRECIO_PROFESIONAL_PREFIX = "PROF_"
 PRECIO_LISTA_PREFIX = "WEB_"
 
+# El Excel real trae el encabezado como "SERVICO" (sin la segunda "I").
+# Se busca por prefijo para que funcione igual si en algún momento se
+# corrige a "SERVICIO".
+SERVICIO_PREFIX = "SERVIC"
+
 COLUMN_MAP_FIJO = {
     "CLAVE": "clave",
     "FAMILIA": "familia",
@@ -59,7 +64,7 @@ def parse_servicio(raw_value) -> bool:
     return (raw_value or "").strip().upper() == "X"
 
 
-def build_insert_rows(df: pd.DataFrame, col_precio_prof: str, col_precio_lista: str, archivo_origen: str):
+def build_insert_rows(df: pd.DataFrame, col_precio_prof: str, col_precio_lista: str, col_servicio: str, archivo_origen: str):
     rows = []
 
     for index, row in df.iterrows():
@@ -74,7 +79,7 @@ def build_insert_rows(df: pd.DataFrame, col_precio_prof: str, col_precio_lista: 
         record["clave"] = clave
         record["precio_profesional"] = clean_value(row.get(col_precio_prof))
         record["precio_lista"] = clean_value(row.get(col_precio_lista))
-        record["servicio"] = parse_servicio(clean_value(row.get("SERVICIO")))
+        record["servicio"] = parse_servicio(clean_value(row.get(col_servicio)) if col_servicio else None)
         record["archivo_origen"] = archivo_origen
         record["hoja_origen"] = EXCEL_SHEET_NAME
         record["fila_excel"] = int(index) + 2
@@ -124,10 +129,11 @@ async def upload_precios_service(file: UploadFile, current_user: dict):
 
         col_precio_prof = find_column_by_prefix(df.columns, PRECIO_PROFESIONAL_PREFIX)
         col_precio_lista = find_column_by_prefix(df.columns, PRECIO_LISTA_PREFIX)
+        col_servicio = find_column_by_prefix(df.columns, SERVICIO_PREFIX)
 
         validate_columns(df, col_precio_prof, col_precio_lista)
 
-        rows = build_insert_rows(df, col_precio_prof, col_precio_lista, file.filename)
+        rows = build_insert_rows(df, col_precio_prof, col_precio_lista, col_servicio, file.filename)
 
         if not rows:
             raise Exception("No se encontraron filas con CLAVE en la hoja PRECIOS.")

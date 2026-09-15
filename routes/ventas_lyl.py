@@ -7,8 +7,9 @@ from services.ventas_lyl_service import (
     get_familias_reporte_service,
     get_profesionales_reporte_service,
     get_reporte_ventas_service,
+    get_reporte_kpis_service,
 )
-from schemas.ventas_lyl_schema import UploadVentasResponse, ReporteVentasResponse
+from schemas.ventas_lyl_schema import UploadVentasResponse, ReporteVentasResponse, ReporteKpisResponse
 
 router = APIRouter(prefix="/ventas-lyl", tags=["Ventas LYL"])
 
@@ -54,6 +55,25 @@ def obtener_reporte_ventas(
 ):
     try:
         return get_reporte_ventas_service(
+            anio1, anio2, metrica, familias, profesionales, dias_semana, quincenas
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/reporte-kpis", response_model=ReporteKpisResponse)
+def obtener_reporte_kpis(
+    anio1: int,
+    anio2: int,
+    metrica: Literal["ganancia_salon", "ganancia_prof", "precio_web"],
+    familias: Optional[List[str]] = Query(None),
+    profesionales: Optional[List[str]] = Query(None),
+    dias_semana: Optional[List[int]] = Query(None),
+    quincenas: Optional[List[int]] = Query(None),
+    current_user: dict = Depends(verify_token)
+):
+    try:
+        return get_reporte_kpis_service(
             anio1, anio2, metrica, familias, profesionales, dias_semana, quincenas
         )
     except Exception as e:

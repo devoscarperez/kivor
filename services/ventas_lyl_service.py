@@ -426,3 +426,279 @@ def get_reporte_ventas_service(
         "valores_anio1": valores_anio1,
         "valores_anio2": valores_anio2,
     }
+
+
+# ============================================================
+# REPORTE DE KPIs (Ticket promedio, clientas nuevas, servicios,
+# cross-selling y ABC de familias)
+# ============================================================
+
+UMBRALES_ABC = [50, 60, 70, 80]
+
+
+def _condiciones_filtros(familias=None, profesionales=None, dias_semana=None, quincenas=None, incluir_familia=True):
+    condiciones = []
+    params = []
+
+    if incluir_familia and familias:
+        condiciones.append("familia = ANY(%s)")
+        params.append(familias)
+
+    if profesionales:
+        condiciones.append("profesional = ANY(%s)")
+        params.append(profesionales)
+
+    if dias_semana:
+        condiciones.append("EXTRACT(ISODOW FROM fecha_entrega)::int = ANY(%s)")
+        params.append(dias_semana)
+
+    if quincenas:
+        condiciones.append(f"({QUINCENA_SQL}) = ANY(%s)")
+        params.append(quincenas)
+
+    return condiciones, params
+
+
+def _serie_mensual(rows, anio1, anio2, valor_default=None):
+    serie1 = [valor_default] * 12
+    serie2 = [valor_default] * 12
+
+    for anio, mes, valor in rows:
+        if anio == anio1:
+            serie1[mes - 1] = valor
+        elif anio == anio2:
+            serie2[mes - 1] = valor
+
+    return serie1, serie2
+
+
+def _calcular_ticket_promedio(cur, anio1, anio2, metrica, familias, profesionales, dias_semana, quincenas):
+    columna = METRICAS_REPORTE[metrica]
+    condiciones, params_extra = _condiciones_filtros(familias, profesionales, dias_semana, quincenas)
+    condiciones = ["EXTRACT(YEAR FROM fecha_entrega) IN (%s, %s)"] + condiciones
+    params = [anio1, anio2] + params_extra
+    where_sql = " AND ".join(condiciones)
+
+    def ticket(suma, clientas):
+        suma = float(suma) if suma is not None else 0.0
+        return (suma / clientas) if clientas else None
+
+    cur.execute(f"""
+        SELECT EXTRACT(YEAR FROM fecha_entrega)::int AS anio,
+               EXTRACT(MONTH FROM fecha_entrega)::int AS mes,
+               SUM({columna}) AS suma,
+               COUNT(DISTINCT rut_celular) AS clientas
+        FROM core.stg_ventas_lyl
+        WHERE {where_sql}
+        GROUP BY 1, 2
+    """, tuple(params))
+    filas_mes = [(anio, mes, ticket(suma, clientas)) for anio, mes, suma, clientas in cur.fetchall()]
+    mensual_anio1, mensual_anio2 = _serie_mensual(filas_mes, anio1, anio2)
+
+    cur.execute(f"""
+        SELECT EXTRACT(YEAR FROM fecha_entrega)::int AS anio,
+               CASE WHEN EXTRACT(MONTH FROM fecha_entrega) <= 6 THEN 1 ELSE 2 END AS semestre,
+               SUM({columna}) AS suma,
+               COUNT(DISTINCT rut_celular) AS clientas
+        FROM core.stg_ventas_lyl
+        WHERE {where_sql}
+        GROUP BY 1, 2
+    """, tuple(params))
+    filas_sem = [(anio, sem, ticket(suma, clientas)) for anio, sem, suma, clientas in cur.fetchall()]
+    semestral_anio1 = [None, None]
+    semestral_anio2 = [None, None]
+    for anio, sem, valor in filas_sem:
+        if anio == anio1:
+            semestral_anio1[sem - 1] = valor
+        elif anio == anio2:
+            semestral_anio2[sem - 1] = valor
+
+    cur.execute(f"""
+        SELECT EXTRACT(YEAR FROM fecha_entrega)::int AS anio,
+               SUM({columna}) AS suma,
+               COUNT(DISTINCT rut_celular) AS clientas
+        FROM core.stg_ventas_lyl
+        WHERE {where_sql}
+        GROUP BY 1
+    """, tuple(params))
+    anual_anio1 = None
+    anual_anio2 = None
+    for anio, suma, clientas in cur.fetchall():
+        if anio == anio1:
+            anual_anio1 = ticket(suma, clientas)
+        elif anio == anio2:
+            anual_anio2 = ticket(suma, clientas)
+
+    return {
+        "mensual_anio1": mensual_anio1, "mensual_anio2": mensual_anio2,
+        "semestral_anio1": semestral_anio1, "semestral_anio2": semestral_anio2,
+        "anual_anio1": anual_anio1, "anual_anio2": anual_anio2,
+    }
+
+
+def _calcular_clientas_nuevas(cur, anio1, anio2, familias, profesionales, dias_semana, quincenas):
+    condiciones, params_extra = _condiciones_filtros(familias, profesionales, dias_semana, quincenas)
+    filtro_extra_sql = (" AND " + " AND ".join(condiciones)) if condiciones else ""
+    params = [anio1, anio2] + params_extra
+
+    cur.execute(f"""
+        WITH primera_compra AS (
+            SELECT rut_celular, MIN(fecha_entrega) AS primera_fecha
+            FROM core.stg_ventas_lyl
+            WHERE rut_celular IS NOT NULL
+            GROUP BY rut_celular
+        )
+        SELECT
+            EXTRACT(YEAR FROM v.fecha_entrega)::int AS anio,
+            EXTRACT(MONTH FROM v.fecha_entrega)::int AS mes,
+            COUNT(DISTINCT v.rut_celular) AS clientas_nuevas
+        FROM core.stg_ventas_lyl v
+        JOIN primera_compra p ON p.rut_celular = v.rut_celular
+        WHERE EXTRACT(YEAR FROM v.fecha_entrega) IN (%s, %s)
+          AND EXTRACT(YEAR FROM p.primera_fecha) = EXTRACT(YEAR FROM v.fecha_entrega)
+          AND EXTRACT(MONTH FROM p.primera_fecha) = EXTRACT(MONTH FROM v.fecha_entrega)
+          {filtro_extra_sql}
+        GROUP BY 1, 2
+    """, tuple(params))
+
+    filas = [(anio, mes, int(cantidad)) for anio, mes, cantidad in cur.fetchall()]
+    return _serie_mensual(filas, anio1, anio2, valor_default=0)
+
+
+def _calcular_servicios(cur, anio1, anio2, familias, profesionales, dias_semana, quincenas):
+    condiciones, params_extra = _condiciones_filtros(familias, profesionales, dias_semana, quincenas)
+    condiciones = ["EXTRACT(YEAR FROM fecha_entrega) IN (%s, %s)"] + condiciones
+    params = [anio1, anio2] + params_extra
+    where_sql = " AND ".join(condiciones)
+
+    cur.execute(f"""
+        SELECT EXTRACT(YEAR FROM fecha_entrega)::int AS anio,
+               EXTRACT(MONTH FROM fecha_entrega)::int AS mes,
+               COUNT(*) AS cantidad
+        FROM core.stg_ventas_lyl
+        WHERE {where_sql}
+        GROUP BY 1, 2
+    """, tuple(params))
+
+    filas = [(anio, mes, int(cantidad)) for anio, mes, cantidad in cur.fetchall()]
+    return _serie_mensual(filas, anio1, anio2, valor_default=0)
+
+
+def _calcular_cross_selling_anio(cur, anio, profesionales, dias_semana, quincenas):
+    condiciones, params_extra = _condiciones_filtros(
+        profesionales=profesionales, dias_semana=dias_semana, quincenas=quincenas, incluir_familia=False
+    )
+    condiciones = ["EXTRACT(YEAR FROM fecha_entrega) = %s", "familia IS NOT NULL"] + condiciones
+    params = [anio] + params_extra
+    where_sql = " AND ".join(condiciones)
+
+    cur.execute(f"""
+        SELECT DISTINCT familia, rut_celular
+        FROM core.stg_ventas_lyl
+        WHERE {where_sql}
+    """, tuple(params))
+
+    clientas_por_familia = {}
+    for familia, rut in cur.fetchall():
+        clientas_por_familia.setdefault(familia, set()).add(rut)
+
+    familias_ordenadas = sorted(clientas_por_familia.keys())
+    matriz = [
+        [len(clientas_por_familia[fa] & clientas_por_familia[fb]) for fb in familias_ordenadas]
+        for fa in familias_ordenadas
+    ]
+
+    return {"familias": familias_ordenadas, "matriz": matriz}
+
+
+def _calcular_abc_familias_anio(cur, anio, profesionales, dias_semana, quincenas):
+    condiciones, params_extra = _condiciones_filtros(
+        profesionales=profesionales, dias_semana=dias_semana, quincenas=quincenas, incluir_familia=False
+    )
+    condiciones = ["EXTRACT(YEAR FROM fecha_entrega) = %s", "familia IS NOT NULL"] + condiciones
+    params = [anio] + params_extra
+    where_sql = " AND ".join(condiciones)
+
+    cur.execute(f"""
+        SELECT familia, SUM(ganancia_salon) AS valor
+        FROM core.stg_ventas_lyl
+        WHERE {where_sql}
+        GROUP BY familia
+        ORDER BY valor DESC NULLS LAST
+    """, tuple(params))
+
+    filas = [(familia, float(valor) if valor is not None else 0.0) for familia, valor in cur.fetchall()]
+    total = sum(valor for _, valor in filas)
+
+    resultado = []
+    acumulado = 0.0
+    umbrales_restantes = list(UMBRALES_ABC)
+
+    for familia, valor in filas:
+        acumulado += valor
+        porcentaje = (valor / total * 100) if total else 0.0
+        porcentaje_acumulado = (acumulado / total * 100) if total else 0.0
+
+        umbrales_alcanzados = []
+        while umbrales_restantes and porcentaje_acumulado >= umbrales_restantes[0]:
+            umbrales_alcanzados.append(umbrales_restantes.pop(0))
+
+        resultado.append({
+            "familia": familia,
+            "valor": round(valor, 2),
+            "porcentaje": round(porcentaje, 2),
+            "porcentaje_acumulado": round(porcentaje_acumulado, 2),
+            "umbrales": umbrales_alcanzados,
+        })
+
+    return resultado
+
+
+def get_reporte_kpis_service(
+    anio1: int,
+    anio2: int,
+    metrica: str,
+    familias: Optional[list] = None,
+    profesionales: Optional[list] = None,
+    dias_semana: Optional[list] = None,
+    quincenas: Optional[list] = None,
+):
+    if metrica not in METRICAS_REPORTE:
+        raise Exception(f"Métrica inválida: {metrica}")
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            ticket = _calcular_ticket_promedio(
+                cur, anio1, anio2, metrica, familias, profesionales, dias_semana, quincenas
+            )
+            clientas_nuevas_anio1, clientas_nuevas_anio2 = _calcular_clientas_nuevas(
+                cur, anio1, anio2, familias, profesionales, dias_semana, quincenas
+            )
+            servicios_anio1, servicios_anio2 = _calcular_servicios(
+                cur, anio1, anio2, familias, profesionales, dias_semana, quincenas
+            )
+            cross_selling_anio1 = _calcular_cross_selling_anio(cur, anio1, profesionales, dias_semana, quincenas)
+            cross_selling_anio2 = _calcular_cross_selling_anio(cur, anio2, profesionales, dias_semana, quincenas)
+            abc_anio1 = _calcular_abc_familias_anio(cur, anio1, profesionales, dias_semana, quincenas)
+            abc_anio2 = _calcular_abc_familias_anio(cur, anio2, profesionales, dias_semana, quincenas)
+
+    return {
+        "anio1": anio1,
+        "anio2": anio2,
+        "metrica": metrica,
+        "meses": MESES_REPORTE,
+        "ticket_mensual_anio1": ticket["mensual_anio1"],
+        "ticket_mensual_anio2": ticket["mensual_anio2"],
+        "ticket_semestral_anio1": ticket["semestral_anio1"],
+        "ticket_semestral_anio2": ticket["semestral_anio2"],
+        "ticket_anual_anio1": ticket["anual_anio1"],
+        "ticket_anual_anio2": ticket["anual_anio2"],
+        "clientas_nuevas_anio1": clientas_nuevas_anio1,
+        "clientas_nuevas_anio2": clientas_nuevas_anio2,
+        "servicios_anio1": servicios_anio1,
+        "servicios_anio2": servicios_anio2,
+        "cross_selling_anio1": cross_selling_anio1,
+        "cross_selling_anio2": cross_selling_anio2,
+        "abc_anio1": abc_anio1,
+        "abc_anio2": abc_anio2,
+    }

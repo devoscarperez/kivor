@@ -6,6 +6,7 @@ from routes import users
 from routes import analytics
 from routes import menu
 from routes import ventas_lyl
+from routes import precios_servicios
 from routes import whatsapp_ai
 from routes import whatsapp_inbox
 
@@ -42,6 +43,7 @@ app.add_middleware(
 )
 
 app.include_router(ventas_lyl.router)
+app.include_router(precios_servicios.router)
 app.include_router(auth.router)
 app.include_router(customers_express.router)
 app.include_router(users.router)

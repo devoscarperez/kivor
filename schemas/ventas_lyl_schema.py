@@ -47,6 +47,8 @@ class ReporteKpisResponse(BaseModel):
     ticket_anual_anio2: Optional[float]
     clientas_nuevas_anio1: list[int]
     clientas_nuevas_anio2: list[int]
+    clientas_nuevas_anual_anio1: int
+    clientas_nuevas_anual_anio2: int
     cross_selling_anio1: CrossSellingAnio
     cross_selling_anio2: CrossSellingAnio
     abc_anio1: list[AbcFamiliaRow]

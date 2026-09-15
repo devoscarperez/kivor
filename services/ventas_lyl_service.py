@@ -660,6 +660,10 @@ def get_reporte_kpis_service(
             clientas_nuevas_anio1, clientas_nuevas_anio2 = _calcular_clientas_nuevas(
                 cur, anio1, anio2, familias, profesionales, dias_semana, quincenas
             )
+            # Una clienta nueva tiene una unica fecha de primera compra, que cae en un
+            # solo mes: sumar los 12 meses del anio no duplica a nadie.
+            clientas_nuevas_anual_anio1 = sum(clientas_nuevas_anio1)
+            clientas_nuevas_anual_anio2 = sum(clientas_nuevas_anio2)
             cross_selling_anio1 = _calcular_cross_selling_anio(cur, anio1, profesionales, dias_semana, quincenas)
             cross_selling_anio2 = _calcular_cross_selling_anio(cur, anio2, profesionales, dias_semana, quincenas)
             abc_anio1 = _calcular_abc_familias_anio(cur, anio1, profesionales, dias_semana, quincenas)
@@ -678,6 +682,8 @@ def get_reporte_kpis_service(
         "ticket_anual_anio2": ticket["anual_anio2"],
         "clientas_nuevas_anio1": clientas_nuevas_anio1,
         "clientas_nuevas_anio2": clientas_nuevas_anio2,
+        "clientas_nuevas_anual_anio1": clientas_nuevas_anual_anio1,
+        "clientas_nuevas_anual_anio2": clientas_nuevas_anual_anio2,
         "cross_selling_anio1": cross_selling_anio1,
         "cross_selling_anio2": cross_selling_anio2,
         "abc_anio1": abc_anio1,

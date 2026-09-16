@@ -499,8 +499,13 @@ def _calcular_ticket_promedio(cur, anio1, anio2, metrica, familias, profesionale
         WHERE {where_sql}
         GROUP BY 1, 2
     """, tuple(params))
-    filas_mes = [(anio, mes, ticket(suma, tickets)) for anio, mes, suma, tickets in cur.fetchall()]
-    mensual_anio1, mensual_anio2 = _serie_mensual(filas_mes, anio1, anio2)
+    filas_mes = [(anio, mes, ticket(suma, tickets), tickets) for anio, mes, suma, tickets in cur.fetchall()]
+    mensual_anio1, mensual_anio2 = _serie_mensual(
+        [(a, m, v) for a, m, v, t in filas_mes], anio1, anio2
+    )
+    mensual_tickets_anio1, mensual_tickets_anio2 = _serie_mensual(
+        [(a, m, t) for a, m, v, t in filas_mes], anio1, anio2, valor_default=0
+    )
 
     cur.execute(f"""
         SELECT EXTRACT(YEAR FROM fecha_entrega)::int AS anio,
@@ -511,14 +516,18 @@ def _calcular_ticket_promedio(cur, anio1, anio2, metrica, familias, profesionale
         WHERE {where_sql}
         GROUP BY 1, 2
     """, tuple(params))
-    filas_sem = [(anio, sem, ticket(suma, tickets)) for anio, sem, suma, tickets in cur.fetchall()]
+    filas_sem = [(anio, sem, ticket(suma, tickets), tickets) for anio, sem, suma, tickets in cur.fetchall()]
     semestral_anio1 = [None, None]
     semestral_anio2 = [None, None]
-    for anio, sem, valor in filas_sem:
+    semestral_tickets_anio1 = [0, 0]
+    semestral_tickets_anio2 = [0, 0]
+    for anio, sem, valor, tickets in filas_sem:
         if anio == anio1:
             semestral_anio1[sem - 1] = valor
+            semestral_tickets_anio1[sem - 1] = tickets
         elif anio == anio2:
             semestral_anio2[sem - 1] = valor
+            semestral_tickets_anio2[sem - 1] = tickets
 
     cur.execute(f"""
         SELECT EXTRACT(YEAR FROM fecha_entrega)::int AS anio,
@@ -530,16 +539,23 @@ def _calcular_ticket_promedio(cur, anio1, anio2, metrica, familias, profesionale
     """, tuple(params))
     anual_anio1 = None
     anual_anio2 = None
+    anual_tickets_anio1 = 0
+    anual_tickets_anio2 = 0
     for anio, suma, tickets in cur.fetchall():
         if anio == anio1:
             anual_anio1 = ticket(suma, tickets)
+            anual_tickets_anio1 = tickets
         elif anio == anio2:
             anual_anio2 = ticket(suma, tickets)
+            anual_tickets_anio2 = tickets
 
     return {
         "mensual_anio1": mensual_anio1, "mensual_anio2": mensual_anio2,
+        "mensual_tickets_anio1": mensual_tickets_anio1, "mensual_tickets_anio2": mensual_tickets_anio2,
         "semestral_anio1": semestral_anio1, "semestral_anio2": semestral_anio2,
+        "semestral_tickets_anio1": semestral_tickets_anio1, "semestral_tickets_anio2": semestral_tickets_anio2,
         "anual_anio1": anual_anio1, "anual_anio2": anual_anio2,
+        "anual_tickets_anio1": anual_tickets_anio1, "anual_tickets_anio2": anual_tickets_anio2,
     }
 
 
@@ -683,10 +699,16 @@ def get_reporte_kpis_service(
         "meses": MESES_REPORTE,
         "ticket_mensual_anio1": ticket["mensual_anio1"],
         "ticket_mensual_anio2": ticket["mensual_anio2"],
+        "ticket_mensual_tickets_anio1": ticket["mensual_tickets_anio1"],
+        "ticket_mensual_tickets_anio2": ticket["mensual_tickets_anio2"],
         "ticket_semestral_anio1": ticket["semestral_anio1"],
         "ticket_semestral_anio2": ticket["semestral_anio2"],
+        "ticket_semestral_tickets_anio1": ticket["semestral_tickets_anio1"],
+        "ticket_semestral_tickets_anio2": ticket["semestral_tickets_anio2"],
         "ticket_anual_anio1": ticket["anual_anio1"],
         "ticket_anual_anio2": ticket["anual_anio2"],
+        "ticket_anual_tickets_anio1": ticket["anual_tickets_anio1"],
+        "ticket_anual_tickets_anio2": ticket["anual_tickets_anio2"],
         "clientas_nuevas_anio1": clientas_nuevas_anio1,
         "clientas_nuevas_anio2": clientas_nuevas_anio2,
         "clientas_nuevas_anual_anio1": clientas_nuevas_anual_anio1,

@@ -41,10 +41,16 @@ class ReporteKpisResponse(BaseModel):
     meses: list[str]
     ticket_mensual_anio1: list[Optional[float]]
     ticket_mensual_anio2: list[Optional[float]]
+    ticket_mensual_tickets_anio1: list[int]
+    ticket_mensual_tickets_anio2: list[int]
     ticket_semestral_anio1: list[Optional[float]]
     ticket_semestral_anio2: list[Optional[float]]
+    ticket_semestral_tickets_anio1: list[int]
+    ticket_semestral_tickets_anio2: list[int]
     ticket_anual_anio1: Optional[float]
     ticket_anual_anio2: Optional[float]
+    ticket_anual_tickets_anio1: int
+    ticket_anual_tickets_anio2: int
     clientas_nuevas_anio1: list[int]
     clientas_nuevas_anio2: list[int]
     clientas_nuevas_anual_anio1: int

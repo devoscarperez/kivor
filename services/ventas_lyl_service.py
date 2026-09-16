@@ -356,6 +356,13 @@ QUINCENA_SQL = """
     END
 """
 
+# Un "ticket" (una atencion) es la combinacion fecha_entrega + nro_formulario,
+# no una clienta. Si nro_formulario viene vacio, se usa ventas_key como
+# respaldo para que cada fila sin formulario cuente como su propio ticket en
+# vez de agruparse por error con otras filas tambien vacias (NULL agrupa con
+# NULL en SQL).
+TICKET_ID_SQL = "(fecha_entrega, COALESCE(NULLIF(TRIM(nro_formulario), ''), ventas_key))"
+
 
 def get_reporte_ventas_service(
     anio1: int,
@@ -479,32 +486,32 @@ def _calcular_ticket_promedio(cur, anio1, anio2, metrica, familias, profesionale
     params = [anio1, anio2] + params_extra
     where_sql = " AND ".join(condiciones)
 
-    def ticket(suma, clientas):
+    def ticket(suma, tickets):
         suma = float(suma) if suma is not None else 0.0
-        return (suma / clientas) if clientas else None
+        return (suma / tickets) if tickets else None
 
     cur.execute(f"""
         SELECT EXTRACT(YEAR FROM fecha_entrega)::int AS anio,
                EXTRACT(MONTH FROM fecha_entrega)::int AS mes,
                SUM({columna}) AS suma,
-               COUNT(DISTINCT rut_celular) AS clientas
+               COUNT(DISTINCT {TICKET_ID_SQL}) AS tickets
         FROM core.stg_ventas_lyl
         WHERE {where_sql}
         GROUP BY 1, 2
     """, tuple(params))
-    filas_mes = [(anio, mes, ticket(suma, clientas)) for anio, mes, suma, clientas in cur.fetchall()]
+    filas_mes = [(anio, mes, ticket(suma, tickets)) for anio, mes, suma, tickets in cur.fetchall()]
     mensual_anio1, mensual_anio2 = _serie_mensual(filas_mes, anio1, anio2)
 
     cur.execute(f"""
         SELECT EXTRACT(YEAR FROM fecha_entrega)::int AS anio,
                CASE WHEN EXTRACT(MONTH FROM fecha_entrega) <= 6 THEN 1 ELSE 2 END AS semestre,
                SUM({columna}) AS suma,
-               COUNT(DISTINCT rut_celular) AS clientas
+               COUNT(DISTINCT {TICKET_ID_SQL}) AS tickets
         FROM core.stg_ventas_lyl
         WHERE {where_sql}
         GROUP BY 1, 2
     """, tuple(params))
-    filas_sem = [(anio, sem, ticket(suma, clientas)) for anio, sem, suma, clientas in cur.fetchall()]
+    filas_sem = [(anio, sem, ticket(suma, tickets)) for anio, sem, suma, tickets in cur.fetchall()]
     semestral_anio1 = [None, None]
     semestral_anio2 = [None, None]
     for anio, sem, valor in filas_sem:
@@ -516,18 +523,18 @@ def _calcular_ticket_promedio(cur, anio1, anio2, metrica, familias, profesionale
     cur.execute(f"""
         SELECT EXTRACT(YEAR FROM fecha_entrega)::int AS anio,
                SUM({columna}) AS suma,
-               COUNT(DISTINCT rut_celular) AS clientas
+               COUNT(DISTINCT {TICKET_ID_SQL}) AS tickets
         FROM core.stg_ventas_lyl
         WHERE {where_sql}
         GROUP BY 1
     """, tuple(params))
     anual_anio1 = None
     anual_anio2 = None
-    for anio, suma, clientas in cur.fetchall():
+    for anio, suma, tickets in cur.fetchall():
         if anio == anio1:
-            anual_anio1 = ticket(suma, clientas)
+            anual_anio1 = ticket(suma, tickets)
         elif anio == anio2:
-            anual_anio2 = ticket(suma, clientas)
+            anual_anio2 = ticket(suma, tickets)
 
     return {
         "mensual_anio1": mensual_anio1, "mensual_anio2": mensual_anio2,

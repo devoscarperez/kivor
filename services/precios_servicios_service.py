@@ -42,7 +42,7 @@ DB_COLUMNS = [
     "duracion_horas", "porcentaje_profesional", "servicio",
     "archivo_origen", "hoja_origen", "fila_excel",
     "precio_fecha_desde", "vigencia", "clave_servicio_vigencia",
-    "price_id",
+    "price_master_key",
 ]
 
 
@@ -221,7 +221,7 @@ async def upload_precios_service(file: UploadFile, mes: str, anio: int, modo: st
         with get_connection() as conn:
             with conn.cursor() as cur:
                 for row in rows:
-                    row["price_id"] = get_or_create_price_id(
+                    row["price_master_key"] = get_or_create_price_id(
                         cur, row["clave"], row["familia"],
                         row["nivel_2"], row["nivel_3"], row["nivel_4"]
                     )

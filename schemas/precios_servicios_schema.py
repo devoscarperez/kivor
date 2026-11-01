@@ -5,4 +5,6 @@ class UploadPreciosResponse(BaseModel):
     success: bool
     rows_deleted: int
     rows_inserted: int
+    vigencia: str
+    modo: str
     message: str

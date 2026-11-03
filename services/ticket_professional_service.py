@@ -80,7 +80,7 @@ def add_ticket_professional(tenant_schema: str, ticket_id: int, professional_id:
         INSERT INTO {schema}.ticket_professional (ticket_id, professional_id)
         VALUES (%s, %s)
         ON CONFLICT (ticket_id, professional_id)
-        DO UPDATE SET ticket_professional_updated_at = ticket_professional_updated_at
+        DO UPDATE SET ticket_professional_updated_at = NOW()
         RETURNING ticket_professional_id, professional_id
     """).format(schema=sql.Identifier(tenant_schema))
 
@@ -128,7 +128,7 @@ def add_ticket_professional_customer(tenant_schema: str, ticket_professional_id:
             (ticket_professional_id, customer_id, ticket_professional_customer_status)
         VALUES (%s, %s, 'Assigned')
         ON CONFLICT (ticket_professional_id, customer_id)
-        DO UPDATE SET ticket_professional_customer_updated_at = ticket_professional_customer_updated_at
+        DO UPDATE SET ticket_professional_customer_updated_at = NOW()
         RETURNING ticket_professional_customer_id, customer_id, ticket_professional_customer_status
     """).format(schema=sql.Identifier(tenant_schema))
 

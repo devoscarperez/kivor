@@ -42,7 +42,7 @@ DB_COLUMNS = [
     "duracion_horas", "porcentaje_profesional", "servicio",
     "archivo_origen", "hoja_origen", "fila_excel",
     "precio_fecha_desde", "vigencia", "clave_servicio_vigencia",
-    "price_master_key",
+    "service_master_id",
 ]
 
 
@@ -129,15 +129,15 @@ def build_insert_rows(
     return rows
 
 
-def get_or_create_price_id(cur, clave, familia, nivel_2, nivel_3, nivel_4) -> int:
+def get_or_create_service_master_id(cur, clave, familia, nivel_2, nivel_3, nivel_4) -> int:
     cur.execute(
         f"""
-        INSERT INTO {TENANT_SCHEMA}.price_master_key
-            (price_master_family, price_master_level2, price_master_level3, price_master_level4, price_master_clave)
+        INSERT INTO {TENANT_SCHEMA}.service_master
+            (service_master_family, service_master_level2, service_master_level3, service_master_level4, service_master_clave)
         VALUES (%s, %s, %s, %s, %s)
-        ON CONFLICT (price_master_clave)
-        DO UPDATE SET price_master_clave = EXCLUDED.price_master_clave
-        RETURNING price_master_id
+        ON CONFLICT (service_master_clave)
+        DO UPDATE SET service_master_clave = EXCLUDED.service_master_clave
+        RETURNING service_master_id
         """,
         (familia, nivel_2, nivel_3, nivel_4, clave),
     )
@@ -221,7 +221,7 @@ async def upload_precios_service(file: UploadFile, mes: str, anio: int, modo: st
         with get_connection() as conn:
             with conn.cursor() as cur:
                 for row in rows:
-                    row["price_master_key"] = get_or_create_price_id(
+                    row["service_master_id"] = get_or_create_service_master_id(
                         cur, row["clave"], row["familia"],
                         row["nivel_2"], row["nivel_3"], row["nivel_4"]
                     )

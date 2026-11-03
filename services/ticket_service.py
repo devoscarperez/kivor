@@ -12,7 +12,7 @@ TICKET_COLUMNS = [
 ]
 
 TICKET_LIST_RESULT_COLUMNS = TICKET_COLUMNS + [
-    "customer_full_name", "customer_nickname", "customer_mobile",
+    "customer_full_name", "customer_nickname", "customer_mobile", "professional_count",
 ]
 
 
@@ -68,7 +68,8 @@ def list_tickets(
     query = sql.SQL("""
         SELECT t.ticket_id, t.ticket_status, t.ticket_created_at, t.ticket_updated_at,
                t.ticket_status_changed_at, t.ticket_customer_id,
-               c.customer_full_name, c.customer_nickname, c.customer_mobile
+               c.customer_full_name, c.customer_nickname, c.customer_mobile,
+               (SELECT COUNT(*) FROM {schema}.ticket_professional tp2 WHERE tp2.ticket_id = t.ticket_id) AS professional_count
         FROM {schema}.ticket t
         LEFT JOIN {schema}.customer c ON c.customer_id = t.ticket_customer_id
         WHERE {conditions}
@@ -85,6 +86,31 @@ def list_tickets(
             rows = cur.fetchall()
 
     return [dict(zip(TICKET_LIST_RESULT_COLUMNS, row)) for row in rows]
+
+
+def get_ticket(tenant_schema: str, ticket_id: int) -> dict:
+    tenant_schema = _validated_schema(tenant_schema)
+
+    query = sql.SQL("""
+        SELECT t.ticket_id, t.ticket_status, t.ticket_created_at, t.ticket_updated_at,
+               t.ticket_status_changed_at, t.ticket_customer_id,
+               c.customer_full_name, c.customer_nickname, c.customer_mobile
+        FROM {schema}.ticket t
+        LEFT JOIN {schema}.customer c ON c.customer_id = t.ticket_customer_id
+        WHERE t.ticket_id = %s
+    """).format(
+        schema=sql.Identifier(tenant_schema),
+    )
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (ticket_id,))
+            row = cur.fetchone()
+
+    if not row:
+        raise Exception("ticket_not_found")
+
+    return dict(zip(TICKET_LIST_RESULT_COLUMNS[:-1], row))
 
 
 def set_ticket_customer(tenant_schema: str, ticket_id: int, customer_id: int) -> dict:

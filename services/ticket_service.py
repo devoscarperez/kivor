@@ -95,7 +95,7 @@ def set_ticket_customer(tenant_schema: str, ticket_id: int, customer_id: int) ->
         SET ticket_customer_id = %s,
             ticket_updated_at = NOW(),
             ticket_status_changed_at = CASE WHEN ticket_status = 'Inactive' THEN NOW() ELSE ticket_status_changed_at END,
-            ticket_status = CASE WHEN ticket_status = 'Inactive' THEN 'Customer' ELSE ticket_status END
+            ticket_status = CASE WHEN ticket_status = 'Inactive' THEN 'Assigned' ELSE ticket_status END
         WHERE ticket_id = %s
         RETURNING {columns}
     """).format(

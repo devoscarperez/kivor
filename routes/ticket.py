@@ -37,6 +37,7 @@ def get_tickets(
     date_to: date = Query(default=None),
     status: list[str] = Query(default=None),
     order: str = Query(default="desc"),
+    date_field: str = Query(default="created"),
     current_user: dict = Depends(verify_token),
 ):
     today = date.today()
@@ -49,6 +50,7 @@ def get_tickets(
             date_to or today,
             status,
             order,
+            date_field,
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

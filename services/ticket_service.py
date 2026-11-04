@@ -44,6 +44,12 @@ def create_ticket(tenant_schema: str, organization_id: int, booking_date: dateti
     return dict(zip(TICKET_COLUMNS, row))
 
 
+DATE_FIELD_COLUMNS = {
+    "created": "ticket_created_at",
+    "booking": "ticket_booking_date",
+}
+
+
 def list_tickets(
     tenant_schema: str,
     organization_id: int,
@@ -51,14 +57,19 @@ def list_tickets(
     date_to: date,
     statuses: list,
     order: str,
+    date_field: str = "created",
 ) -> list:
     tenant_schema = _validated_schema(tenant_schema)
 
+    if date_field not in DATE_FIELD_COLUMNS:
+        raise Exception(f"date_field inválido: '{date_field}'. Debe ser 'created' o 'booking'.")
+
     order_sql = sql.SQL("ASC") if order == "asc" else sql.SQL("DESC")
+    date_column = sql.Identifier(DATE_FIELD_COLUMNS[date_field])
 
     conditions = [
         sql.SQL("t.organization_id = %s"),
-        sql.SQL("t.ticket_created_at::date BETWEEN %s AND %s"),
+        sql.SQL("t.{column}::date BETWEEN %s AND %s").format(column=date_column),
     ]
     params = [organization_id, date_from, date_to]
 

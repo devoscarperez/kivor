@@ -26,7 +26,11 @@ def get_connection():
         parsed.fragment
     ))
 
-    return psycopg.connect(clean_url)
+    conn = psycopg.connect(clean_url)
+    with conn.cursor() as cur:
+        cur.execute("SET TIME ZONE 'America/Santiago'")
+
+    return conn
 
 
 def set_tenant_schema(conn, schema):

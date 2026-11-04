@@ -12,6 +12,8 @@ TICKET_COLUMNS = [
     "ticket_booking_date",
 ]
 
+VALID_STATUSES = ["Inactive", "Assigned", "Started", "Completed", "Approved", "Finished"]
+
 TICKET_LIST_RESULT_COLUMNS = TICKET_COLUMNS + [
     "customer_full_name", "customer_nickname", "customer_mobile", "professional_count",
 ]
@@ -144,6 +146,36 @@ def set_ticket_customer(tenant_schema: str, ticket_id: int, customer_id: int) ->
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(query, (customer_id, ticket_id))
+            row = cur.fetchone()
+        conn.commit()
+
+    if not row:
+        raise Exception("ticket_not_found")
+
+    return dict(zip(TICKET_COLUMNS, row))
+
+
+def set_ticket_status(tenant_schema: str, ticket_id: int, status: str) -> dict:
+    tenant_schema = _validated_schema(tenant_schema)
+
+    if status not in VALID_STATUSES:
+        raise Exception(f"status inválido: '{status}'")
+
+    query = sql.SQL("""
+        UPDATE {schema}.ticket
+        SET ticket_status = %s,
+            ticket_status_changed_at = NOW(),
+            ticket_updated_at = NOW()
+        WHERE ticket_id = %s
+        RETURNING {columns}
+    """).format(
+        schema=sql.Identifier(tenant_schema),
+        columns=sql.SQL(", ").join(sql.Identifier(c) for c in TICKET_COLUMNS),
+    )
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (status, ticket_id))
             row = cur.fetchone()
         conn.commit()
 

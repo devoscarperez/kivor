@@ -1,6 +1,6 @@
 # services/ticket_service.py
 
-from datetime import date
+from datetime import date, datetime
 
 from psycopg import sql
 
@@ -9,6 +9,7 @@ from core.db import get_connection
 TICKET_COLUMNS = [
     "ticket_id", "ticket_status", "ticket_created_at",
     "ticket_updated_at", "ticket_status_changed_at", "ticket_customer_id",
+    "ticket_booking_date",
 ]
 
 TICKET_LIST_RESULT_COLUMNS = TICKET_COLUMNS + [
@@ -22,12 +23,12 @@ def _validated_schema(tenant_schema: str) -> str:
     return tenant_schema
 
 
-def create_ticket(tenant_schema: str, organization_id: int) -> dict:
+def create_ticket(tenant_schema: str, organization_id: int, booking_date: datetime) -> dict:
     tenant_schema = _validated_schema(tenant_schema)
 
     query = sql.SQL("""
-        INSERT INTO {schema}.ticket (organization_id)
-        VALUES (%s)
+        INSERT INTO {schema}.ticket (organization_id, ticket_booking_date)
+        VALUES (%s, %s)
         RETURNING {columns}
     """).format(
         schema=sql.Identifier(tenant_schema),
@@ -36,7 +37,7 @@ def create_ticket(tenant_schema: str, organization_id: int) -> dict:
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(query, (organization_id,))
+            cur.execute(query, (organization_id, booking_date))
             row = cur.fetchone()
         conn.commit()
 
@@ -67,7 +68,7 @@ def list_tickets(
 
     query = sql.SQL("""
         SELECT t.ticket_id, t.ticket_status, t.ticket_created_at, t.ticket_updated_at,
-               t.ticket_status_changed_at, t.ticket_customer_id,
+               t.ticket_status_changed_at, t.ticket_customer_id, t.ticket_booking_date,
                c.customer_full_name, c.customer_nickname, c.customer_mobile,
                (SELECT COUNT(*) FROM {schema}.ticket_professional tp2 WHERE tp2.ticket_id = t.ticket_id) AS professional_count
         FROM {schema}.ticket t
@@ -93,7 +94,7 @@ def get_ticket(tenant_schema: str, ticket_id: int) -> dict:
 
     query = sql.SQL("""
         SELECT t.ticket_id, t.ticket_status, t.ticket_created_at, t.ticket_updated_at,
-               t.ticket_status_changed_at, t.ticket_customer_id,
+               t.ticket_status_changed_at, t.ticket_customer_id, t.ticket_booking_date,
                c.customer_full_name, c.customer_nickname, c.customer_mobile
         FROM {schema}.ticket t
         LEFT JOIN {schema}.customer c ON c.customer_id = t.ticket_customer_id

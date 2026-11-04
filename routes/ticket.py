@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
@@ -13,10 +13,14 @@ class SetCustomerBody(BaseModel):
     customer_id: int
 
 
+class CreateTicketBody(BaseModel):
+    booking_date: datetime
+
+
 @router.post("")
-def post_ticket(current_user: dict = Depends(verify_token)):
+def post_ticket(body: CreateTicketBody, current_user: dict = Depends(verify_token)):
     try:
-        return create_ticket(current_user["tenant_schema"], current_user["organization_id"])
+        return create_ticket(current_user["tenant_schema"], current_user["organization_id"], body.booking_date)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

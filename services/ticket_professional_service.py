@@ -1,6 +1,6 @@
 # services/ticket_professional_service.py
 
-from datetime import datetime
+from datetime import date, datetime
 
 from psycopg import sql
 
@@ -236,3 +236,34 @@ def remove_ticket_professional_customer(tenant_schema: str, ticket_professional_
         raise Exception("ticket_professional_customer_not_found")
 
     return {"ticket_professional_customer_id": ticket_professional_customer_id}
+
+
+def get_customer_agenda(tenant_schema: str, customer_id: int, agenda_date: date) -> list:
+    tenant_schema = _validated_schema(tenant_schema)
+
+    query = sql.SQL("""
+        SELECT tpc.ticket_professional_customer_booking_date,
+               p.professional_name, p.professional_nickname,
+               tp.ticket_id
+        FROM {schema}.ticket_professional_customer tpc
+        JOIN {schema}.ticket_professional tp ON tp.ticket_professional_id = tpc.ticket_professional_id
+        JOIN core.professional p ON p.professional_id = tp.professional_id
+        WHERE tpc.customer_id = %s
+          AND tpc.ticket_professional_customer_booking_date::date = %s
+        ORDER BY tpc.ticket_professional_customer_booking_date ASC
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (customer_id, agenda_date))
+            rows = cur.fetchall()
+
+    return [
+        {
+            "booking_date": row[0],
+            "professional_name": row[1],
+            "professional_nickname": row[2],
+            "ticket_id": row[3],
+        }
+        for row in rows
+    ]

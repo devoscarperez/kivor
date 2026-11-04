@@ -96,6 +96,16 @@ def add_ticket_professional(tenant_schema: str, ticket_id: int, professional_id:
 def remove_ticket_professional(tenant_schema: str, ticket_id: int, ticket_professional_id: int) -> dict:
     tenant_schema = _validated_schema(tenant_schema)
 
+    has_products_query = sql.SQL("""
+        SELECT EXISTS(
+            SELECT 1
+            FROM {schema}.ticket_professional_customer_product tpcp
+            JOIN {schema}.ticket_professional_customer tpc
+                ON tpc.ticket_professional_customer_id = tpcp.ticket_professional_customer_id
+            WHERE tpc.ticket_professional_id = %s
+        )
+    """).format(schema=sql.Identifier(tenant_schema))
+
     delete_customers_query = sql.SQL("""
         DELETE FROM {schema}.ticket_professional_customer
         WHERE ticket_professional_id = %s
@@ -109,6 +119,13 @@ def remove_ticket_professional(tenant_schema: str, ticket_id: int, ticket_profes
 
     with get_connection() as conn:
         with conn.cursor() as cur:
+            cur.execute(has_products_query, (ticket_professional_id,))
+            if cur.fetchone()[0]:
+                raise Exception(
+                    "No se puede quitar la profesional: tiene clientas con servicios asociados. "
+                    "Elimina esos servicios primero."
+                )
+
             cur.execute(delete_customers_query, (ticket_professional_id,))
             cur.execute(delete_professional_query, (ticket_professional_id, ticket_id))
             row = cur.fetchone()
@@ -148,6 +165,14 @@ def add_ticket_professional_customer(tenant_schema: str, ticket_professional_id:
 def remove_ticket_professional_customer(tenant_schema: str, ticket_professional_customer_id: int) -> dict:
     tenant_schema = _validated_schema(tenant_schema)
 
+    has_products_query = sql.SQL("""
+        SELECT EXISTS(
+            SELECT 1
+            FROM {schema}.ticket_professional_customer_product
+            WHERE ticket_professional_customer_id = %s
+        )
+    """).format(schema=sql.Identifier(tenant_schema))
+
     query = sql.SQL("""
         DELETE FROM {schema}.ticket_professional_customer
         WHERE ticket_professional_customer_id = %s
@@ -156,6 +181,13 @@ def remove_ticket_professional_customer(tenant_schema: str, ticket_professional_
 
     with get_connection() as conn:
         with conn.cursor() as cur:
+            cur.execute(has_products_query, (ticket_professional_customer_id,))
+            if cur.fetchone()[0]:
+                raise Exception(
+                    "No se puede quitar la clienta: tiene servicios asociados. "
+                    "Elimina esos servicios primero."
+                )
+
             cur.execute(query, (ticket_professional_customer_id,))
             row = cur.fetchone()
         conn.commit()

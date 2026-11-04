@@ -140,3 +140,29 @@ def set_ticket_customer(tenant_schema: str, ticket_id: int, customer_id: int) ->
         raise Exception("ticket_not_found")
 
     return dict(zip(TICKET_COLUMNS, row))
+
+
+def set_ticket_booking_date(tenant_schema: str, ticket_id: int, booking_date: datetime) -> dict:
+    tenant_schema = _validated_schema(tenant_schema)
+
+    query = sql.SQL("""
+        UPDATE {schema}.ticket
+        SET ticket_booking_date = %s,
+            ticket_updated_at = NOW()
+        WHERE ticket_id = %s
+        RETURNING {columns}
+    """).format(
+        schema=sql.Identifier(tenant_schema),
+        columns=sql.SQL(", ").join(sql.Identifier(c) for c in TICKET_COLUMNS),
+    )
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (booking_date, ticket_id))
+            row = cur.fetchone()
+        conn.commit()
+
+    if not row:
+        raise Exception("ticket_not_found")
+
+    return dict(zip(TICKET_COLUMNS, row))

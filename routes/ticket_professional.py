@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 
@@ -8,6 +10,7 @@ from services.ticket_professional_service import (
     remove_ticket_professional,
     add_ticket_professional_customer,
     remove_ticket_professional_customer,
+    set_ticket_professional_customer_booking_date,
 )
 
 router = APIRouter(prefix="/ticket/{ticket_id}/professionals", tags=["Ticket Professional"])
@@ -19,6 +22,11 @@ class AddProfessionalBody(BaseModel):
 
 class AddCustomerBody(BaseModel):
     customer_id: int
+    booking_date: datetime
+
+
+class SetCustomerBookingDateBody(BaseModel):
+    booking_date: datetime
 
 
 @router.get("")
@@ -62,7 +70,7 @@ def post_ticket_professional_customer(
 ):
     try:
         return add_ticket_professional_customer(
-            current_user["tenant_schema"], ticket_professional_id, body.customer_id
+            current_user["tenant_schema"], ticket_professional_id, body.customer_id, body.booking_date
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -78,6 +86,22 @@ def delete_ticket_professional_customer(
     try:
         return remove_ticket_professional_customer(
             current_user["tenant_schema"], ticket_professional_customer_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/{ticket_professional_id}/customers/{ticket_professional_customer_id}/booking-date")
+def patch_ticket_professional_customer_booking_date(
+    ticket_id: int,
+    ticket_professional_id: int,
+    ticket_professional_customer_id: int,
+    body: SetCustomerBookingDateBody,
+    current_user: dict = Depends(verify_token),
+):
+    try:
+        return set_ticket_professional_customer_booking_date(
+            current_user["tenant_schema"], ticket_professional_customer_id, body.booking_date
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

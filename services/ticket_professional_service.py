@@ -1,5 +1,7 @@
 # services/ticket_professional_service.py
 
+from datetime import datetime
+
 from psycopg import sql
 
 from core.db import get_connection
@@ -45,7 +47,8 @@ def list_ticket_professionals(tenant_schema: str, ticket_id: int) -> list:
                 customers_query = sql.SQL("""
                     SELECT tpc.ticket_professional_id, tpc.ticket_professional_customer_id,
                            tpc.customer_id, c.customer_full_name, c.customer_nickname,
-                           tpc.ticket_professional_customer_status
+                           tpc.ticket_professional_customer_status,
+                           tpc.ticket_professional_customer_booking_date
                     FROM {schema}.ticket_professional_customer tpc
                     JOIN {schema}.customer c ON c.customer_id = tpc.customer_id
                     WHERE tpc.ticket_professional_id = ANY(%s)
@@ -63,6 +66,7 @@ def list_ticket_professionals(tenant_schema: str, ticket_id: int) -> list:
                         "customer_full_name": row[3],
                         "customer_nickname": row[4],
                         "ticket_professional_customer_status": row[5],
+                        "ticket_professional_customer_booking_date": row[6],
                     })
 
                 for professional in professionals:
@@ -137,21 +141,25 @@ def remove_ticket_professional(tenant_schema: str, ticket_id: int, ticket_profes
     return {"ticket_professional_id": ticket_professional_id}
 
 
-def add_ticket_professional_customer(tenant_schema: str, ticket_professional_id: int, customer_id: int) -> dict:
+def add_ticket_professional_customer(
+    tenant_schema: str, ticket_professional_id: int, customer_id: int, booking_date: datetime
+) -> dict:
     tenant_schema = _validated_schema(tenant_schema)
 
     query = sql.SQL("""
         INSERT INTO {schema}.ticket_professional_customer
-            (ticket_professional_id, customer_id, ticket_professional_customer_status)
-        VALUES (%s, %s, 'Assigned')
+            (ticket_professional_id, customer_id, ticket_professional_customer_status,
+             ticket_professional_customer_booking_date)
+        VALUES (%s, %s, 'Assigned', %s)
         ON CONFLICT (ticket_professional_id, customer_id)
         DO UPDATE SET ticket_professional_customer_updated_at = NOW()
-        RETURNING ticket_professional_customer_id, customer_id, ticket_professional_customer_status
+        RETURNING ticket_professional_customer_id, customer_id, ticket_professional_customer_status,
+                  ticket_professional_customer_booking_date
     """).format(schema=sql.Identifier(tenant_schema))
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(query, (ticket_professional_id, customer_id))
+            cur.execute(query, (ticket_professional_id, customer_id, booking_date))
             row = cur.fetchone()
         conn.commit()
 
@@ -159,6 +167,38 @@ def add_ticket_professional_customer(tenant_schema: str, ticket_professional_id:
         "ticket_professional_customer_id": row[0],
         "customer_id": row[1],
         "ticket_professional_customer_status": row[2],
+        "ticket_professional_customer_booking_date": row[3],
+    }
+
+
+def set_ticket_professional_customer_booking_date(
+    tenant_schema: str, ticket_professional_customer_id: int, booking_date: datetime
+) -> dict:
+    tenant_schema = _validated_schema(tenant_schema)
+
+    query = sql.SQL("""
+        UPDATE {schema}.ticket_professional_customer
+        SET ticket_professional_customer_booking_date = %s,
+            ticket_professional_customer_updated_at = NOW()
+        WHERE ticket_professional_customer_id = %s
+        RETURNING ticket_professional_customer_id, customer_id, ticket_professional_customer_status,
+                  ticket_professional_customer_booking_date
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (booking_date, ticket_professional_customer_id))
+            row = cur.fetchone()
+        conn.commit()
+
+    if not row:
+        raise Exception("ticket_professional_customer_not_found")
+
+    return {
+        "ticket_professional_customer_id": row[0],
+        "customer_id": row[1],
+        "ticket_professional_customer_status": row[2],
+        "ticket_professional_customer_booking_date": row[3],
     }
 
 

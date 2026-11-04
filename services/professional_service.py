@@ -31,3 +31,14 @@ def search_professionals(term: str) -> list:
             rows = cur.fetchall()
 
     return [dict(zip(PROFESSIONAL_SEARCH_COLUMNS, row)) for row in rows]
+
+
+def get_professional_id_by_person(person_id: int):
+    query = sql.SQL("SELECT professional_id FROM core.professional WHERE person_id = %s")
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (person_id,))
+            row = cur.fetchone()
+
+    return row[0] if row else None

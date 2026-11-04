@@ -11,6 +11,7 @@ from services.ticket_professional_service import (
     add_ticket_professional_customer,
     remove_ticket_professional_customer,
     set_ticket_professional_customer_booking_date,
+    add_ticket_professional_customer_product,
 )
 
 router = APIRouter(prefix="/ticket/{ticket_id}/professionals", tags=["Ticket Professional"])
@@ -27,6 +28,14 @@ class AddCustomerBody(BaseModel):
 
 class SetCustomerBookingDateBody(BaseModel):
     booking_date: datetime
+
+
+class AddCustomerProductBody(BaseModel):
+    product_id: int
+    product_name: str
+    unit_price: float
+    professional_unit_price: float
+    quantity: float = 1
 
 
 @router.get("")
@@ -86,6 +95,24 @@ def delete_ticket_professional_customer(
     try:
         return remove_ticket_professional_customer(
             current_user["tenant_schema"], ticket_professional_customer_id
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{ticket_professional_id}/customers/{ticket_professional_customer_id}/products")
+def post_ticket_professional_customer_product(
+    ticket_id: int,
+    ticket_professional_id: int,
+    ticket_professional_customer_id: int,
+    body: AddCustomerProductBody,
+    current_user: dict = Depends(verify_token),
+):
+    try:
+        return add_ticket_professional_customer_product(
+            current_user["tenant_schema"], ticket_professional_customer_id,
+            body.product_id, body.product_name, body.unit_price,
+            body.professional_unit_price, body.quantity,
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

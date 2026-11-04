@@ -238,6 +238,111 @@ def remove_ticket_professional_customer(tenant_schema: str, ticket_professional_
     return {"ticket_professional_customer_id": ticket_professional_customer_id}
 
 
+def list_my_agenda_today(tenant_schema: str, professional_id: int, today: date) -> list:
+    tenant_schema = _validated_schema(tenant_schema)
+
+    rows_query = sql.SQL("""
+        SELECT tpc.ticket_professional_customer_id, tpc.ticket_professional_id, tpc.customer_id,
+               c.customer_full_name, c.customer_nickname,
+               tpc.ticket_professional_customer_booking_date, tp.ticket_id
+        FROM {schema}.ticket_professional_customer tpc
+        JOIN {schema}.ticket_professional tp ON tp.ticket_professional_id = tpc.ticket_professional_id
+        JOIN {schema}.ticket t ON t.ticket_id = tp.ticket_id
+        JOIN {schema}.customer c ON c.customer_id = tpc.customer_id
+        WHERE tp.professional_id = %s
+          AND t.ticket_booking_date::date = %s
+        ORDER BY tpc.ticket_professional_customer_booking_date ASC
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(rows_query, (professional_id, today))
+            rows = cur.fetchall()
+
+            items = [
+                {
+                    "ticket_professional_customer_id": row[0],
+                    "ticket_professional_id": row[1],
+                    "customer_id": row[2],
+                    "customer_full_name": row[3],
+                    "customer_nickname": row[4],
+                    "booking_date": row[5],
+                    "ticket_id": row[6],
+                    "products": [],
+                }
+                for row in rows
+            ]
+
+            tpc_ids = [item["ticket_professional_customer_id"] for item in items]
+
+            if tpc_ids:
+                products_query = sql.SQL("""
+                    SELECT ticket_professional_customer_id, ticket_professional_customer_product_id,
+                           product_id, product_name, quantity, unit_price, professional_unit_price
+                    FROM {schema}.ticket_professional_customer_product
+                    WHERE ticket_professional_customer_id = ANY(%s)
+                    ORDER BY ticket_professional_customer_product_created_at ASC
+                """).format(schema=sql.Identifier(tenant_schema))
+
+                cur.execute(products_query, (tpc_ids,))
+                product_rows = cur.fetchall()
+
+                by_tpc = {}
+                for prow in product_rows:
+                    by_tpc.setdefault(prow[0], []).append({
+                        "ticket_professional_customer_product_id": prow[1],
+                        "product_id": prow[2],
+                        "product_name": prow[3],
+                        "quantity": prow[4],
+                        "unit_price": prow[5],
+                        "professional_unit_price": prow[6],
+                    })
+
+                for item in items:
+                    item["products"] = by_tpc.get(item["ticket_professional_customer_id"], [])
+
+    return items
+
+
+def add_ticket_professional_customer_product(
+    tenant_schema: str,
+    ticket_professional_customer_id: int,
+    product_id: int,
+    product_name: str,
+    unit_price: float,
+    professional_unit_price: float,
+    quantity: float = 1,
+) -> dict:
+    tenant_schema = _validated_schema(tenant_schema)
+
+    query = sql.SQL("""
+        INSERT INTO {schema}.ticket_professional_customer_product
+            (ticket_professional_customer_id, product_id, product_name, quantity,
+             unit_price, professional_unit_price)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        RETURNING ticket_professional_customer_product_id, product_id, product_name,
+                  quantity, unit_price, professional_unit_price
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (
+                ticket_professional_customer_id, product_id, product_name,
+                quantity, unit_price, professional_unit_price,
+            ))
+            row = cur.fetchone()
+        conn.commit()
+
+    return {
+        "ticket_professional_customer_product_id": row[0],
+        "product_id": row[1],
+        "product_name": row[2],
+        "quantity": row[3],
+        "unit_price": row[4],
+        "professional_unit_price": row[5],
+    }
+
+
 def get_customer_agenda(tenant_schema: str, customer_id: int, agenda_date: date) -> list:
     tenant_schema = _validated_schema(tenant_schema)
 

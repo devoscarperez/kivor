@@ -4,6 +4,7 @@ from datetime import date
 
 import pandas as pd
 from fastapi import UploadFile
+from psycopg import sql
 from core.db import get_connection
 from services.ventas_lyl_service import clean_value, normalize_columns
 
@@ -15,6 +16,19 @@ MES_A_NUMERO = {
     "ENE": 1, "FEB": 2, "MAR": 3, "ABR": 4, "MAY": 5, "JUN": 6,
     "JUL": 7, "AGO": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DIC": 12,
 }
+
+NUMERO_A_MES = {numero: mes for mes, numero in MES_A_NUMERO.items()}
+
+
+def vigencia_actual() -> str:
+    hoy = date.today()
+    return f"{NUMERO_A_MES[hoy.month]}{hoy.year}"
+
+
+def _validated_schema(tenant_schema: str) -> str:
+    if not tenant_schema or not tenant_schema.isidentifier():
+        raise Exception("invalid_tenant")
+    return tenant_schema
 
 MODOS_VALIDOS = {"full", "parcial"}
 
@@ -247,3 +261,78 @@ async def upload_precios_service(file: UploadFile, mes: str, anio: int, modo: st
 
     except Exception as e:
         raise Exception(f"Error cargando precios: {str(e)}")
+
+
+def get_opciones_servicio(
+    tenant_schema: str, familia: str = None, nivel_2: str = None, nivel_3: str = None
+) -> dict:
+    tenant_schema = _validated_schema(tenant_schema)
+    vigencia = vigencia_actual()
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                sql.SQL("""
+                    SELECT DISTINCT familia FROM {schema}.precios_servicios
+                    WHERE vigencia = %s AND servicio = true AND familia IS NOT NULL
+                    ORDER BY familia
+                """).format(schema=sql.Identifier(tenant_schema)),
+                (vigencia,),
+            )
+            familias = [row[0] for row in cur.fetchall()]
+
+            niveles_2 = []
+            if familia:
+                cur.execute(
+                    sql.SQL("""
+                        SELECT DISTINCT nivel_2 FROM {schema}.precios_servicios
+                        WHERE vigencia = %s AND servicio = true AND familia = %s AND nivel_2 IS NOT NULL
+                        ORDER BY nivel_2
+                    """).format(schema=sql.Identifier(tenant_schema)),
+                    (vigencia, familia),
+                )
+                niveles_2 = [row[0] for row in cur.fetchall()]
+
+            niveles_3 = []
+            if familia and nivel_2:
+                cur.execute(
+                    sql.SQL("""
+                        SELECT DISTINCT nivel_3 FROM {schema}.precios_servicios
+                        WHERE vigencia = %s AND servicio = true AND familia = %s AND nivel_2 = %s
+                          AND nivel_3 IS NOT NULL
+                        ORDER BY nivel_3
+                    """).format(schema=sql.Identifier(tenant_schema)),
+                    (vigencia, familia, nivel_2),
+                )
+                niveles_3 = [row[0] for row in cur.fetchall()]
+
+            servicios = []
+            if familia and nivel_2 and nivel_3:
+                cur.execute(
+                    sql.SQL("""
+                        SELECT service_master_id, clave, nivel_4, precio_lista, precio_profesional
+                        FROM {schema}.precios_servicios
+                        WHERE vigencia = %s AND servicio = true AND familia = %s AND nivel_2 = %s
+                          AND nivel_3 = %s
+                        ORDER BY nivel_4
+                    """).format(schema=sql.Identifier(tenant_schema)),
+                    (vigencia, familia, nivel_2, nivel_3),
+                )
+                servicios = [
+                    {
+                        "service_master_id": row[0],
+                        "clave": row[1],
+                        "nivel_4": row[2],
+                        "precio_lista": row[3],
+                        "precio_profesional": row[4],
+                    }
+                    for row in cur.fetchall()
+                ]
+
+    return {
+        "vigencia": vigencia,
+        "familias": familias,
+        "niveles_2": niveles_2,
+        "niveles_3": niveles_3,
+        "servicios": servicios,
+    }

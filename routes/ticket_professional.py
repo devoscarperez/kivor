@@ -79,7 +79,7 @@ def post_ticket_professional_customer(
 ):
     try:
         return add_ticket_professional_customer(
-            current_user["tenant_schema"], ticket_professional_id, body.customer_id, body.booking_date
+            current_user["tenant_schema"], ticket_id, ticket_professional_id, body.customer_id, body.booking_date
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -110,7 +110,7 @@ def post_ticket_professional_customer_product(
 ):
     try:
         return add_ticket_professional_customer_product(
-            current_user["tenant_schema"], ticket_professional_customer_id,
+            current_user["tenant_schema"], ticket_id, ticket_professional_id, ticket_professional_customer_id,
             body.product_id, body.product_name, body.unit_price,
             body.professional_unit_price, body.quantity,
         )

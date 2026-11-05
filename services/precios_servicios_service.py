@@ -146,12 +146,12 @@ def build_insert_rows(
 def get_or_create_service_master_id(cur, clave, familia, nivel_2, nivel_3, nivel_4) -> int:
     cur.execute(
         f"""
-        INSERT INTO {TENANT_SCHEMA}.service_master
-            (service_master_family, service_master_level2, service_master_level3, service_master_level4, service_master_clave)
+        INSERT INTO {TENANT_SCHEMA}.product_master
+            (family, level2, level3, level4, clave)
         VALUES (%s, %s, %s, %s, %s)
-        ON CONFLICT (service_master_clave)
-        DO UPDATE SET service_master_clave = EXCLUDED.service_master_clave
-        RETURNING service_master_id
+        ON CONFLICT (clave)
+        DO UPDATE SET clave = EXCLUDED.clave
+        RETURNING id
         """,
         (familia, nivel_2, nivel_3, nivel_4, clave),
     )

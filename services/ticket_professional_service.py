@@ -45,14 +45,14 @@ def list_ticket_professionals(tenant_schema: str, ticket_id: int) -> list:
 
             if ticket_professional_ids:
                 customers_query = sql.SQL("""
-                    SELECT tpc.ticket_professional_id, tpc.ticket_professional_customer_id,
+                    SELECT tpc.ticket_professional_id, tpc.id,
                            tpc.customer_id, c.customer_full_name, c.customer_nickname,
-                           tpc.ticket_professional_customer_status,
-                           tpc.ticket_professional_customer_booking_date
+                           tpc.status,
+                           tpc.booking_date
                     FROM {schema}.ticket_professional_customer tpc
                     JOIN {schema}.customer c ON c.customer_id = tpc.customer_id
                     WHERE tpc.ticket_professional_id = ANY(%s)
-                    ORDER BY tpc.ticket_professional_customer_created_at ASC
+                    ORDER BY tpc.created_at ASC
                 """).format(schema=sql.Identifier(tenant_schema))
 
                 cur.execute(customers_query, (ticket_professional_ids,))
@@ -105,7 +105,7 @@ def remove_ticket_professional(tenant_schema: str, ticket_id: int, ticket_profes
             SELECT 1
             FROM {schema}.ticket_professional_customer_product tpcp
             JOIN {schema}.ticket_professional_customer tpc
-                ON tpc.ticket_professional_customer_id = tpcp.ticket_professional_customer_id
+                ON tpc.id = tpcp.ticket_professional_customer_id
             WHERE tpc.ticket_professional_id = %s
         )
     """).format(schema=sql.Identifier(tenant_schema))
@@ -142,24 +142,22 @@ def remove_ticket_professional(tenant_schema: str, ticket_id: int, ticket_profes
 
 
 def add_ticket_professional_customer(
-    tenant_schema: str, ticket_professional_id: int, customer_id: int, booking_date: datetime
+    tenant_schema: str, ticket_id: int, ticket_professional_id: int, customer_id: int, booking_date: datetime
 ) -> dict:
     tenant_schema = _validated_schema(tenant_schema)
 
     query = sql.SQL("""
         INSERT INTO {schema}.ticket_professional_customer
-            (ticket_professional_id, customer_id, ticket_professional_customer_status,
-             ticket_professional_customer_booking_date)
-        VALUES (%s, %s, 'Assigned', %s)
+            (ticket_id, ticket_professional_id, customer_id, status, booking_date)
+        VALUES (%s, %s, %s, 'Assigned', %s)
         ON CONFLICT (ticket_professional_id, customer_id)
-        DO UPDATE SET ticket_professional_customer_updated_at = NOW()
-        RETURNING ticket_professional_customer_id, customer_id, ticket_professional_customer_status,
-                  ticket_professional_customer_booking_date
+        DO UPDATE SET updated_at = NOW()
+        RETURNING id, customer_id, status, booking_date
     """).format(schema=sql.Identifier(tenant_schema))
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(query, (ticket_professional_id, customer_id, booking_date))
+            cur.execute(query, (ticket_id, ticket_professional_id, customer_id, booking_date))
             row = cur.fetchone()
         conn.commit()
 
@@ -178,11 +176,10 @@ def set_ticket_professional_customer_booking_date(
 
     query = sql.SQL("""
         UPDATE {schema}.ticket_professional_customer
-        SET ticket_professional_customer_booking_date = %s,
-            ticket_professional_customer_updated_at = NOW()
-        WHERE ticket_professional_customer_id = %s
-        RETURNING ticket_professional_customer_id, customer_id, ticket_professional_customer_status,
-                  ticket_professional_customer_booking_date
+        SET booking_date = %s,
+            updated_at = NOW()
+        WHERE id = %s
+        RETURNING id, customer_id, status, booking_date
     """).format(schema=sql.Identifier(tenant_schema))
 
     with get_connection() as conn:
@@ -215,8 +212,8 @@ def remove_ticket_professional_customer(tenant_schema: str, ticket_professional_
 
     query = sql.SQL("""
         DELETE FROM {schema}.ticket_professional_customer
-        WHERE ticket_professional_customer_id = %s
-        RETURNING ticket_professional_customer_id
+        WHERE id = %s
+        RETURNING id
     """).format(schema=sql.Identifier(tenant_schema))
 
     with get_connection() as conn:
@@ -242,16 +239,16 @@ def list_my_agenda_today(tenant_schema: str, professional_id: int, today: date) 
     tenant_schema = _validated_schema(tenant_schema)
 
     rows_query = sql.SQL("""
-        SELECT tpc.ticket_professional_customer_id, tpc.ticket_professional_id, tpc.customer_id,
+        SELECT tpc.id, tpc.ticket_professional_id, tpc.customer_id,
                c.customer_full_name, c.customer_nickname,
-               tpc.ticket_professional_customer_booking_date, tp.ticket_id
+               tpc.booking_date, tpc.ticket_id
         FROM {schema}.ticket_professional_customer tpc
-        JOIN {schema}.ticket_professional tp ON tp.ticket_professional_id = tpc.ticket_professional_id
-        JOIN {schema}.ticket t ON t.ticket_id = tp.ticket_id
+        JOIN {schema}.ticket_professional tp ON tp.id = tpc.ticket_professional_id
+        JOIN {schema}.ticket t ON t.id = tpc.ticket_id
         JOIN {schema}.customer c ON c.customer_id = tpc.customer_id
         WHERE tp.professional_id = %s
-          AND t.ticket_booking_date::date = %s
-        ORDER BY tpc.ticket_professional_customer_booking_date ASC
+          AND t.booking_date::date = %s
+        ORDER BY tpc.booking_date ASC
     """).format(schema=sql.Identifier(tenant_schema))
 
     with get_connection() as conn:
@@ -277,11 +274,11 @@ def list_my_agenda_today(tenant_schema: str, professional_id: int, today: date) 
 
             if tpc_ids:
                 products_query = sql.SQL("""
-                    SELECT ticket_professional_customer_id, ticket_professional_customer_product_id,
+                    SELECT ticket_professional_customer_id, id,
                            product_id, product_name, quantity, unit_price, professional_unit_price
                     FROM {schema}.ticket_professional_customer_product
                     WHERE ticket_professional_customer_id = ANY(%s)
-                    ORDER BY ticket_professional_customer_product_created_at ASC
+                    ORDER BY created_at ASC
                 """).format(schema=sql.Identifier(tenant_schema))
 
                 cur.execute(products_query, (tpc_ids,))
@@ -306,6 +303,8 @@ def list_my_agenda_today(tenant_schema: str, professional_id: int, today: date) 
 
 def add_ticket_professional_customer_product(
     tenant_schema: str,
+    ticket_id: int,
+    ticket_professional_id: int,
     ticket_professional_customer_id: int,
     product_id: int,
     product_name: str,
@@ -317,18 +316,18 @@ def add_ticket_professional_customer_product(
 
     query = sql.SQL("""
         INSERT INTO {schema}.ticket_professional_customer_product
-            (ticket_professional_customer_id, product_id, product_name, quantity,
-             unit_price, professional_unit_price)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        RETURNING ticket_professional_customer_product_id, product_id, product_name,
+            (ticket_id, ticket_professional_id, ticket_professional_customer_id,
+             product_id, product_name, quantity, unit_price, professional_unit_price)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id, product_id, product_name,
                   quantity, unit_price, professional_unit_price
     """).format(schema=sql.Identifier(tenant_schema))
 
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(query, (
-                ticket_professional_customer_id, product_id, product_name,
-                quantity, unit_price, professional_unit_price,
+                ticket_id, ticket_professional_id, ticket_professional_customer_id,
+                product_id, product_name, quantity, unit_price, professional_unit_price,
             ))
             row = cur.fetchone()
         conn.commit()
@@ -347,15 +346,15 @@ def get_customer_agenda(tenant_schema: str, customer_id: int, agenda_date: date)
     tenant_schema = _validated_schema(tenant_schema)
 
     query = sql.SQL("""
-        SELECT tpc.ticket_professional_customer_booking_date,
+        SELECT tpc.booking_date,
                p.professional_name, p.professional_nickname,
-               tp.ticket_id
+               tpc.ticket_id
         FROM {schema}.ticket_professional_customer tpc
-        JOIN {schema}.ticket_professional tp ON tp.ticket_professional_id = tpc.ticket_professional_id
+        JOIN {schema}.ticket_professional tp ON tp.id = tpc.ticket_professional_id
         JOIN core.professional p ON p.professional_id = tp.professional_id
         WHERE tpc.customer_id = %s
-          AND tpc.ticket_professional_customer_booking_date::date = %s
-        ORDER BY tpc.ticket_professional_customer_booking_date ASC
+          AND tpc.booking_date::date = %s
+        ORDER BY tpc.booking_date ASC
     """).format(schema=sql.Identifier(tenant_schema))
 
     with get_connection() as conn:

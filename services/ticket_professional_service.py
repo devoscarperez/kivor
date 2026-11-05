@@ -17,12 +17,12 @@ def list_ticket_professionals(tenant_schema: str, ticket_id: int) -> list:
     tenant_schema = _validated_schema(tenant_schema)
 
     professionals_query = sql.SQL("""
-        SELECT tp.ticket_professional_id, tp.professional_id,
+        SELECT tp.id, tp.professional_id,
                p.professional_name, p.professional_nickname
         FROM {schema}.ticket_professional tp
         JOIN core.professional p ON p.professional_id = tp.professional_id
         WHERE tp.ticket_id = %s
-        ORDER BY tp.ticket_professional_created_at ASC
+        ORDER BY tp.created_at ASC
     """).format(schema=sql.Identifier(tenant_schema))
 
     with get_connection() as conn:
@@ -84,8 +84,8 @@ def add_ticket_professional(tenant_schema: str, ticket_id: int, professional_id:
         INSERT INTO {schema}.ticket_professional (ticket_id, professional_id)
         VALUES (%s, %s)
         ON CONFLICT (ticket_id, professional_id)
-        DO UPDATE SET ticket_professional_updated_at = NOW()
-        RETURNING ticket_professional_id, professional_id
+        DO UPDATE SET updated_at = NOW()
+        RETURNING id, professional_id
     """).format(schema=sql.Identifier(tenant_schema))
 
     with get_connection() as conn:
@@ -117,8 +117,8 @@ def remove_ticket_professional(tenant_schema: str, ticket_id: int, ticket_profes
 
     delete_professional_query = sql.SQL("""
         DELETE FROM {schema}.ticket_professional
-        WHERE ticket_professional_id = %s AND ticket_id = %s
-        RETURNING ticket_professional_id
+        WHERE id = %s AND ticket_id = %s
+        RETURNING id
     """).format(schema=sql.Identifier(tenant_schema))
 
     with get_connection() as conn:

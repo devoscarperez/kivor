@@ -1,4 +1,5 @@
 from services.auth_service import login_user
+from services.professional_service import get_professional_display_name_by_person
 from schemas.auth_schema import (
     LoginRequest,
     LoginUsernameRequest,
@@ -14,6 +15,18 @@ from core.db import get_connection
 from core.security import create_access_token, get_token_expiration_minutes,  verify_token
 
 router = APIRouter()
+
+
+@router.get("/me")
+def get_me(current_user: dict = Depends(verify_token)):
+    professional_name = None
+    if current_user.get("person_id"):
+        professional_name = get_professional_display_name_by_person(current_user["person_id"])
+
+    return {
+        "username": current_user["username"],
+        "professional_name": professional_name,
+    }
 
 @router.post("/login")
 def login(request: Request, data: LoginRequest):

@@ -42,3 +42,18 @@ def get_professional_id_by_person(person_id: int):
             row = cur.fetchone()
 
     return row[0] if row else None
+
+
+def get_professional_display_name_by_person(person_id: int):
+    query = sql.SQL("""
+        SELECT COALESCE(professional_nickname, professional_name)
+        FROM core.professional
+        WHERE person_id = %s
+    """)
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (person_id,))
+            row = cur.fetchone()
+
+    return row[0] if row else None

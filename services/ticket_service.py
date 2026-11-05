@@ -6,10 +6,20 @@ from psycopg import sql
 
 from core.db import get_connection
 
+# Claves expuestas hacia el frontend (API/JSON) - se mantienen iguales
+# aunque las columnas reales de la tabla "ticket" se renombraron (se
+# les quitó el prefijo "ticket_"), para no tener que tocar el frontend.
 TICKET_COLUMNS = [
     "ticket_id", "ticket_status", "ticket_created_at",
     "ticket_updated_at", "ticket_status_changed_at", "ticket_customer_id",
     "ticket_booking_date",
+]
+
+# Columnas reales de lindasylunaticas.ticket, en el mismo orden que TICKET_COLUMNS.
+TICKET_DB_COLUMNS = [
+    "id", "status", "created_at",
+    "updated_at", "status_changed_at", "customer_id",
+    "booking_date",
 ]
 
 VALID_STATUSES = ["Inactive", "Assigned", "Started", "Completed", "Approved", "Finished"]
@@ -29,12 +39,12 @@ def create_ticket(tenant_schema: str, organization_id: int, booking_date: dateti
     tenant_schema = _validated_schema(tenant_schema)
 
     query = sql.SQL("""
-        INSERT INTO {schema}.ticket (organization_id, ticket_booking_date)
+        INSERT INTO {schema}.ticket (organization_id, booking_date)
         VALUES (%s, %s)
         RETURNING {columns}
     """).format(
         schema=sql.Identifier(tenant_schema),
-        columns=sql.SQL(", ").join(sql.Identifier(c) for c in TICKET_COLUMNS),
+        columns=sql.SQL(", ").join(sql.Identifier(c) for c in TICKET_DB_COLUMNS),
     )
 
     with get_connection() as conn:
@@ -47,8 +57,8 @@ def create_ticket(tenant_schema: str, organization_id: int, booking_date: dateti
 
 
 DATE_FIELD_COLUMNS = {
-    "created": "ticket_created_at",
-    "booking": "ticket_booking_date",
+    "created": "created_at",
+    "booking": "booking_date",
 }
 
 
@@ -76,18 +86,18 @@ def list_tickets(
     params = [organization_id, date_from, date_to]
 
     if statuses:
-        conditions.append(sql.SQL("t.ticket_status = ANY(%s)"))
+        conditions.append(sql.SQL("t.status = ANY(%s)"))
         params.append(statuses)
 
     query = sql.SQL("""
-        SELECT t.ticket_id, t.ticket_status, t.ticket_created_at, t.ticket_updated_at,
-               t.ticket_status_changed_at, t.ticket_customer_id, t.ticket_booking_date,
+        SELECT t.id, t.status, t.created_at, t.updated_at,
+               t.status_changed_at, t.customer_id, t.booking_date,
                c.customer_full_name, c.customer_nickname, c.customer_mobile,
-               (SELECT COUNT(*) FROM {schema}.ticket_professional tp2 WHERE tp2.ticket_id = t.ticket_id) AS professional_count
+               (SELECT COUNT(*) FROM {schema}.ticket_professional tp2 WHERE tp2.ticket_id = t.id) AS professional_count
         FROM {schema}.ticket t
-        LEFT JOIN {schema}.customer c ON c.customer_id = t.ticket_customer_id
+        LEFT JOIN {schema}.customer c ON c.customer_id = t.customer_id
         WHERE {conditions}
-        ORDER BY t.ticket_created_at {order}
+        ORDER BY t.created_at {order}
     """).format(
         schema=sql.Identifier(tenant_schema),
         conditions=sql.SQL(" AND ").join(conditions),
@@ -106,12 +116,12 @@ def get_ticket(tenant_schema: str, ticket_id: int) -> dict:
     tenant_schema = _validated_schema(tenant_schema)
 
     query = sql.SQL("""
-        SELECT t.ticket_id, t.ticket_status, t.ticket_created_at, t.ticket_updated_at,
-               t.ticket_status_changed_at, t.ticket_customer_id, t.ticket_booking_date,
+        SELECT t.id, t.status, t.created_at, t.updated_at,
+               t.status_changed_at, t.customer_id, t.booking_date,
                c.customer_full_name, c.customer_nickname, c.customer_mobile
         FROM {schema}.ticket t
-        LEFT JOIN {schema}.customer c ON c.customer_id = t.ticket_customer_id
-        WHERE t.ticket_id = %s
+        LEFT JOIN {schema}.customer c ON c.customer_id = t.customer_id
+        WHERE t.id = %s
     """).format(
         schema=sql.Identifier(tenant_schema),
     )
@@ -132,15 +142,15 @@ def set_ticket_customer(tenant_schema: str, ticket_id: int, customer_id: int) ->
 
     query = sql.SQL("""
         UPDATE {schema}.ticket
-        SET ticket_customer_id = %s,
-            ticket_updated_at = NOW(),
-            ticket_status_changed_at = CASE WHEN ticket_status = 'Inactive' THEN NOW() ELSE ticket_status_changed_at END,
-            ticket_status = CASE WHEN ticket_status = 'Inactive' THEN 'Assigned' ELSE ticket_status END
-        WHERE ticket_id = %s
+        SET customer_id = %s,
+            updated_at = NOW(),
+            status_changed_at = CASE WHEN status = 'Inactive' THEN NOW() ELSE status_changed_at END,
+            status = CASE WHEN status = 'Inactive' THEN 'Assigned' ELSE status END
+        WHERE id = %s
         RETURNING {columns}
     """).format(
         schema=sql.Identifier(tenant_schema),
-        columns=sql.SQL(", ").join(sql.Identifier(c) for c in TICKET_COLUMNS),
+        columns=sql.SQL(", ").join(sql.Identifier(c) for c in TICKET_DB_COLUMNS),
     )
 
     with get_connection() as conn:
@@ -163,14 +173,14 @@ def set_ticket_status(tenant_schema: str, ticket_id: int, status: str) -> dict:
 
     query = sql.SQL("""
         UPDATE {schema}.ticket
-        SET ticket_status = %s,
-            ticket_status_changed_at = NOW(),
-            ticket_updated_at = NOW()
-        WHERE ticket_id = %s
+        SET status = %s,
+            status_changed_at = NOW(),
+            updated_at = NOW()
+        WHERE id = %s
         RETURNING {columns}
     """).format(
         schema=sql.Identifier(tenant_schema),
-        columns=sql.SQL(", ").join(sql.Identifier(c) for c in TICKET_COLUMNS),
+        columns=sql.SQL(", ").join(sql.Identifier(c) for c in TICKET_DB_COLUMNS),
     )
 
     with get_connection() as conn:
@@ -190,13 +200,13 @@ def set_ticket_booking_date(tenant_schema: str, ticket_id: int, booking_date: da
 
     query = sql.SQL("""
         UPDATE {schema}.ticket
-        SET ticket_booking_date = %s,
-            ticket_updated_at = NOW()
-        WHERE ticket_id = %s
+        SET booking_date = %s,
+            updated_at = NOW()
+        WHERE id = %s
         RETURNING {columns}
     """).format(
         schema=sql.Identifier(tenant_schema),
-        columns=sql.SQL(", ").join(sql.Identifier(c) for c in TICKET_COLUMNS),
+        columns=sql.SQL(", ").join(sql.Identifier(c) for c in TICKET_DB_COLUMNS),
     )
 
     with get_connection() as conn:

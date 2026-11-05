@@ -267,7 +267,9 @@ def get_opciones_servicio(
     tenant_schema: str, familia: str = None, nivel_2: str = None, nivel_3: str = None
 ) -> dict:
     tenant_schema = _validated_schema(tenant_schema)
-    vigencia = vigencia_actual()
+    # TODO: hardcode temporal mientras solo existe precio cargado para SEP2026.
+    # Revertir a vigencia_actual() cuando se cargue la vigencia del mes en curso.
+    vigencia = "SEP2026"
 
     with get_connection() as conn:
         with conn.cursor() as cur:

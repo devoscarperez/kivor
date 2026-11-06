@@ -388,6 +388,43 @@ def add_ticket_professional_customer_product(
     }
 
 
+def remove_ticket_professional_customer_product(
+    tenant_schema: str, ticket_professional_customer_product_id: int
+) -> dict:
+    tenant_schema = _validated_schema(tenant_schema)
+
+    status_query = sql.SQL("""
+        SELECT tpc.status
+        FROM {schema}.ticket_professional_customer_product tpcp
+        JOIN {schema}.ticket_professional_customer tpc ON tpc.id = tpcp.ticket_professional_customer_id
+        WHERE tpcp.id = %s
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    delete_query = sql.SQL("""
+        DELETE FROM {schema}.ticket_professional_customer_product
+        WHERE id = %s
+        RETURNING id
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(status_query, (ticket_professional_customer_product_id,))
+            status_row = cur.fetchone()
+
+            if not status_row:
+                raise Exception("ticket_professional_customer_product_not_found")
+            if status_row[0] != "Assigned":
+                raise Exception(
+                    "No se puede eliminar el servicio: la atención de esta clienta ya fue finalizada."
+                )
+
+            cur.execute(delete_query, (ticket_professional_customer_product_id,))
+            row = cur.fetchone()
+        conn.commit()
+
+    return {"ticket_professional_customer_product_id": row[0]}
+
+
 def get_customer_agenda(tenant_schema: str, customer_id: int, agenda_date: date) -> list:
     tenant_schema = _validated_schema(tenant_schema)
 

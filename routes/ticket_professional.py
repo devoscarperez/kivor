@@ -12,6 +12,7 @@ from services.ticket_professional_service import (
     remove_ticket_professional_customer,
     set_ticket_professional_customer_booking_date,
     add_ticket_professional_customer_product,
+    remove_ticket_professional_customer_product,
     complete_ticket_professional_customer,
 )
 
@@ -114,6 +115,22 @@ def post_ticket_professional_customer_product(
             current_user["tenant_schema"], ticket_id, ticket_professional_id, ticket_professional_customer_id,
             body.product_id, body.product_name, body.unit_price,
             body.professional_unit_price, body.quantity,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/{ticket_professional_id}/customers/{ticket_professional_customer_id}/products/{ticket_professional_customer_product_id}")
+def delete_ticket_professional_customer_product(
+    ticket_id: int,
+    ticket_professional_id: int,
+    ticket_professional_customer_id: int,
+    ticket_professional_customer_product_id: int,
+    current_user: dict = Depends(verify_token),
+):
+    try:
+        return remove_ticket_professional_customer_product(
+            current_user["tenant_schema"], ticket_professional_customer_product_id
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

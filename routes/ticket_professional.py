@@ -12,6 +12,7 @@ from services.ticket_professional_service import (
     remove_ticket_professional_customer,
     set_ticket_professional_customer_booking_date,
     add_ticket_professional_customer_product,
+    complete_ticket_professional_customer,
 )
 
 router = APIRouter(prefix="/ticket/{ticket_id}/professionals", tags=["Ticket Professional"])
@@ -113,6 +114,21 @@ def post_ticket_professional_customer_product(
             current_user["tenant_schema"], ticket_id, ticket_professional_id, ticket_professional_customer_id,
             body.product_id, body.product_name, body.unit_price,
             body.professional_unit_price, body.quantity,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/{ticket_professional_id}/customers/{ticket_professional_customer_id}/complete")
+def patch_ticket_professional_customer_complete(
+    ticket_id: int,
+    ticket_professional_id: int,
+    ticket_professional_customer_id: int,
+    current_user: dict = Depends(verify_token),
+):
+    try:
+        return complete_ticket_professional_customer(
+            current_user["tenant_schema"], ticket_professional_customer_id
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

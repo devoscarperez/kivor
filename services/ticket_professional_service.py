@@ -235,13 +235,44 @@ def remove_ticket_professional_customer(tenant_schema: str, ticket_professional_
     return {"ticket_professional_customer_id": ticket_professional_customer_id}
 
 
+def complete_ticket_professional_customer(tenant_schema: str, ticket_professional_customer_id: int) -> dict:
+    tenant_schema = _validated_schema(tenant_schema)
+
+    query = sql.SQL("""
+        UPDATE {schema}.ticket_professional_customer
+        SET status = 'Completed',
+            changed_at = NOW(),
+            updated_at = NOW()
+        WHERE id = %s AND status = 'Assigned'
+        RETURNING id, customer_id, status, booking_date
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (ticket_professional_customer_id,))
+            row = cur.fetchone()
+        conn.commit()
+
+    if not row:
+        raise Exception(
+            "No se pudo finalizar la atención: la clienta no existe o ya no está en estado Assigned."
+        )
+
+    return {
+        "ticket_professional_customer_id": row[0],
+        "customer_id": row[1],
+        "ticket_professional_customer_status": row[2],
+        "ticket_professional_customer_booking_date": row[3],
+    }
+
+
 def list_my_agenda_today(tenant_schema: str, professional_id: int, today: date) -> list:
     tenant_schema = _validated_schema(tenant_schema)
 
     rows_query = sql.SQL("""
         SELECT tpc.id, tpc.ticket_professional_id, tpc.customer_id,
                c.customer_full_name, c.customer_nickname,
-               tpc.booking_date, tpc.ticket_id
+               tpc.booking_date, tpc.ticket_id, tpc.status
         FROM {schema}.ticket_professional_customer tpc
         JOIN {schema}.ticket_professional tp ON tp.id = tpc.ticket_professional_id
         JOIN {schema}.ticket t ON t.id = tpc.ticket_id
@@ -265,6 +296,7 @@ def list_my_agenda_today(tenant_schema: str, professional_id: int, today: date) 
                     "customer_nickname": row[4],
                     "booking_date": row[5],
                     "ticket_id": row[6],
+                    "ticket_professional_customer_status": row[7],
                     "products": [],
                 }
                 for row in rows
@@ -314,6 +346,10 @@ def add_ticket_professional_customer_product(
 ) -> dict:
     tenant_schema = _validated_schema(tenant_schema)
 
+    status_query = sql.SQL("""
+        SELECT status FROM {schema}.ticket_professional_customer WHERE id = %s
+    """).format(schema=sql.Identifier(tenant_schema))
+
     query = sql.SQL("""
         INSERT INTO {schema}.ticket_professional_customer_product
             (ticket_id, ticket_professional_id, ticket_professional_customer_id,
@@ -325,6 +361,16 @@ def add_ticket_professional_customer_product(
 
     with get_connection() as conn:
         with conn.cursor() as cur:
+            cur.execute(status_query, (ticket_professional_customer_id,))
+            status_row = cur.fetchone()
+
+            if not status_row:
+                raise Exception("ticket_professional_customer_not_found")
+            if status_row[0] != "Assigned":
+                raise Exception(
+                    "No se pueden agregar servicios: la atención de esta clienta ya fue finalizada."
+                )
+
             cur.execute(query, (
                 ticket_id, ticket_professional_id, ticket_professional_customer_id,
                 product_id, product_name, quantity, unit_price, professional_unit_price,

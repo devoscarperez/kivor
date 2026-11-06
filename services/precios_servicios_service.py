@@ -271,8 +271,36 @@ def get_opciones_servicio(
     # Revertir a vigencia_actual() cuando se cargue la vigencia del mes en curso.
     vigencia = "SEP2026"
 
+    niveles_2 = []
+    niveles_3 = []
+    servicios = []
+
     with get_connection() as conn:
         with conn.cursor() as cur:
+            def servicios_finales(condiciones, params):
+                cur.execute(
+                    sql.SQL("""
+                        SELECT service_master_id, clave, nivel_4, precio_lista, precio_profesional
+                        FROM {schema}.precios_servicios
+                        WHERE {condiciones}
+                        ORDER BY nivel_4
+                    """).format(
+                        schema=sql.Identifier(tenant_schema),
+                        condiciones=sql.SQL(" AND ").join(condiciones),
+                    ),
+                    params,
+                )
+                return [
+                    {
+                        "service_master_id": row[0],
+                        "clave": row[1],
+                        "nivel_4": row[2],
+                        "precio_lista": row[3],
+                        "precio_profesional": row[4],
+                    }
+                    for row in cur.fetchall()
+                ]
+
             cur.execute(
                 sql.SQL("""
                     SELECT DISTINCT familia FROM {schema}.precios_servicios
@@ -283,8 +311,12 @@ def get_opciones_servicio(
             )
             familias = [row[0] for row in cur.fetchall()]
 
-            niveles_2 = []
             if familia:
+                condiciones_familia = [
+                    sql.SQL("vigencia = %s"), sql.SQL("servicio = true"), sql.SQL("familia = %s"),
+                ]
+                params_familia = [vigencia, familia]
+
                 cur.execute(
                     sql.SQL("""
                         SELECT DISTINCT nivel_2 FROM {schema}.precios_servicios
@@ -295,41 +327,36 @@ def get_opciones_servicio(
                 )
                 niveles_2 = [row[0] for row in cur.fetchall()]
 
-            niveles_3 = []
-            if familia and nivel_2:
-                cur.execute(
-                    sql.SQL("""
-                        SELECT DISTINCT nivel_3 FROM {schema}.precios_servicios
-                        WHERE vigencia = %s AND servicio = true AND familia = %s AND nivel_2 = %s
-                          AND nivel_3 IS NOT NULL
-                        ORDER BY nivel_3
-                    """).format(schema=sql.Identifier(tenant_schema)),
-                    (vigencia, familia, nivel_2),
-                )
-                niveles_3 = [row[0] for row in cur.fetchall()]
+                if not niveles_2:
+                    # Servicio de 1 solo nivel (familia): no hay nada mas que pedir.
+                    servicios = servicios_finales(condiciones_familia, params_familia)
 
-            servicios = []
-            if familia and nivel_2 and nivel_3:
-                cur.execute(
-                    sql.SQL("""
-                        SELECT service_master_id, clave, nivel_4, precio_lista, precio_profesional
-                        FROM {schema}.precios_servicios
-                        WHERE vigencia = %s AND servicio = true AND familia = %s AND nivel_2 = %s
-                          AND nivel_3 = %s
-                        ORDER BY nivel_4
-                    """).format(schema=sql.Identifier(tenant_schema)),
-                    (vigencia, familia, nivel_2, nivel_3),
-                )
-                servicios = [
-                    {
-                        "service_master_id": row[0],
-                        "clave": row[1],
-                        "nivel_4": row[2],
-                        "precio_lista": row[3],
-                        "precio_profesional": row[4],
-                    }
-                    for row in cur.fetchall()
-                ]
+                elif nivel_2:
+                    condiciones_nivel2 = condiciones_familia + [sql.SQL("nivel_2 = %s")]
+                    params_nivel2 = params_familia + [nivel_2]
+
+                    cur.execute(
+                        sql.SQL("""
+                            SELECT DISTINCT nivel_3 FROM {schema}.precios_servicios
+                            WHERE vigencia = %s AND servicio = true AND familia = %s AND nivel_2 = %s
+                              AND nivel_3 IS NOT NULL
+                            ORDER BY nivel_3
+                        """).format(schema=sql.Identifier(tenant_schema)),
+                        (vigencia, familia, nivel_2),
+                    )
+                    niveles_3 = [row[0] for row in cur.fetchall()]
+
+                    if not niveles_3:
+                        # Servicio de 2 niveles (familia + nivel_2).
+                        servicios = servicios_finales(condiciones_nivel2, params_nivel2)
+
+                    elif nivel_3:
+                        condiciones_nivel3 = condiciones_nivel2 + [sql.SQL("nivel_3 = %s")]
+                        params_nivel3 = params_nivel2 + [nivel_3]
+                        # Servicio de 3 o 4 niveles: estas son las opciones finales
+                        # (si tienen nivel_4 cargado, el frontend lo muestra; si no,
+                        # es un servicio de 3 niveles y ya esta completo).
+                        servicios = servicios_finales(condiciones_nivel3, params_nivel3)
 
     return {
         "vigencia": vigencia,

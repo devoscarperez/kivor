@@ -306,11 +306,14 @@ def list_my_agenda_today(tenant_schema: str, professional_id: int, today: date) 
 
             if tpc_ids:
                 products_query = sql.SQL("""
-                    SELECT ticket_professional_customer_id, id,
-                           product_id, product_name, quantity, unit_price, professional_unit_price
-                    FROM {schema}.ticket_professional_customer_product
-                    WHERE ticket_professional_customer_id = ANY(%s)
-                    ORDER BY created_at ASC
+                    SELECT tpcp.ticket_professional_customer_id, tpcp.id,
+                           tpcp.product_id, tpcp.product_name, tpcp.quantity,
+                           tpcp.unit_price, tpcp.professional_unit_price,
+                           pm.level2, pm.level3, pm.level4
+                    FROM {schema}.ticket_professional_customer_product tpcp
+                    LEFT JOIN {schema}.product_master pm ON pm.id = tpcp.product_id
+                    WHERE tpcp.ticket_professional_customer_id = ANY(%s)
+                    ORDER BY tpcp.created_at ASC
                 """).format(schema=sql.Identifier(tenant_schema))
 
                 cur.execute(products_query, (tpc_ids,))
@@ -318,10 +321,12 @@ def list_my_agenda_today(tenant_schema: str, professional_id: int, today: date) 
 
                 by_tpc = {}
                 for prow in product_rows:
+                    niveles = [nivel for nivel in (prow[7], prow[8], prow[9]) if nivel]
                     by_tpc.setdefault(prow[0], []).append({
                         "ticket_professional_customer_product_id": prow[1],
                         "product_id": prow[2],
                         "product_name": prow[3],
+                        "product_label": " · ".join(niveles) if niveles else prow[3],
                         "quantity": prow[4],
                         "unit_price": prow[5],
                         "professional_unit_price": prow[6],

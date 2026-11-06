@@ -279,7 +279,7 @@ def list_my_agenda_today(tenant_schema: str, professional_id: int, today: date) 
         JOIN {schema}.customer c ON c.customer_id = tpc.customer_id
         WHERE tp.professional_id = %s
           AND t.booking_date::date = %s
-        ORDER BY tpc.booking_date ASC
+        ORDER BY CASE WHEN tpc.status = 'Assigned' THEN 0 ELSE 1 END, tpc.booking_date ASC
     """).format(schema=sql.Identifier(tenant_schema))
 
     with get_connection() as conn:

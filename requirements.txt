@@ -6,3 +6,4 @@ bcrypt
 pandas
 openpyxl
 python-multipart
+fpdf2

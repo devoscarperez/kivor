@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Response
 from pydantic import BaseModel
 
 from core.security import verify_token
@@ -8,6 +8,7 @@ from services.ticket_service import (
     create_ticket, list_tickets, set_ticket_customer, get_ticket, set_ticket_booking_date,
     set_ticket_status,
 )
+from services.ticket_voucher_service import generar_voucher_pdf
 
 router = APIRouter(prefix="/ticket", tags=["Ticket"])
 
@@ -65,6 +66,19 @@ def get_tickets(
 def get_single_ticket(ticket_id: int, current_user: dict = Depends(verify_token)):
     try:
         return get_ticket(current_user["tenant_schema"], ticket_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{ticket_id}/voucher")
+def get_ticket_voucher(ticket_id: int, current_user: dict = Depends(verify_token)):
+    try:
+        pdf_bytes, nombre_archivo = generar_voucher_pdf(current_user["tenant_schema"], ticket_id)
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{nombre_archivo}"'},
+        )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

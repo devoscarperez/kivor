@@ -178,7 +178,7 @@ def generar_voucher_pdf(tenant_schema: str, ticket_id: int) -> tuple:
     pdf.set_text_color(*COLOR_GRIS_OSCURO)
     pdf.cell(70, 7, f"Fecha: {formatear_fecha_hora(ticket.get('ticket_booking_date'))}")
 
-    pdf.set_xy(MARGEN_IZQ, y_inicio + 24)
+    pdf.set_xy(MARGEN_IZQ, y_inicio + 34)
     pdf.set_font("Helvetica", "B", 11)
     pdf.set_text_color(*COLOR_PRIMARIO)
     pdf.cell(25, 7, "Clienta:")

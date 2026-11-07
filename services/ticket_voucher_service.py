@@ -14,6 +14,19 @@ from services.ticket_service import get_ticket
 LOGO_PATH = Path(__file__).resolve().parent.parent / "assets" / "logo-lindasylunaticas.png"
 SITIO_WEB = "www.lindasylunaticas.cl"
 
+# Paleta de marca (paleta de colores principales.pdf)
+COLOR_PRIMARIO = (238, 70, 108)      # #EE466C
+COLOR_SECUNDARIO = (240, 98, 130)    # #F06282
+COLOR_CLARO = (241, 141, 186)        # #F18DBA
+COLOR_DORADO = (233, 174, 33)        # #E9AE21
+COLOR_VERDE = (144, 199, 65)         # #90C741
+COLOR_GRIS_CLARO = (187, 189, 191)   # #BBBDBF
+COLOR_GRIS_OSCURO = (78, 78, 78)     # #4E4E4E
+
+MARGEN_IZQ = 10
+MARGEN_DER = 200
+ANCHO_CONTENIDO = MARGEN_DER - MARGEN_IZQ
+
 
 def _validated_schema(tenant_schema: str) -> str:
     if not tenant_schema or not tenant_schema.isidentifier():
@@ -119,6 +132,15 @@ def _obtener_bloques(tenant_schema: str, ticket_id: int) -> list:
     return bloques
 
 
+def _banda(pdf, texto, color_fondo, color_texto=(255, 255, 255), alto=8, tamano=12):
+    pdf.set_fill_color(*color_fondo)
+    pdf.set_text_color(*color_texto)
+    pdf.set_font("Helvetica", "B", tamano)
+    pdf.set_xy(MARGEN_IZQ, pdf.get_y())
+    pdf.cell(ANCHO_CONTENIDO, alto, texto, align="C", fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_text_color(*COLOR_GRIS_OSCURO)
+
+
 def generar_voucher_pdf(tenant_schema: str, ticket_id: int) -> tuple:
     tenant_schema = _validated_schema(tenant_schema)
 
@@ -132,68 +154,127 @@ def generar_voucher_pdf(tenant_schema: str, ticket_id: int) -> tuple:
     nombre_titular = ticket.get("customer_full_name") or ticket.get("customer_nickname") or "(sin nombre)"
 
     pdf = FPDF(orientation="P", unit="mm", format="A4")
-    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
+    pdf.set_text_color(*COLOR_GRIS_OSCURO)
 
+    # Marco general de la hoja
+    pdf.set_draw_color(*COLOR_PRIMARIO)
+    pdf.set_line_width(0.8)
+    pdf.rect(8, 8, 194, 281, style="D", round_corners=True, corner_radius=4)
+
+    # Cabecera: logo + N° + Fecha (igual al formulario de papel)
+    y_inicio = 14
     if LOGO_PATH.exists():
-        pdf.image(str(LOGO_PATH), x=85, y=10, w=40)
-        pdf.set_y(55)
-    else:
-        pdf.set_y(15)
+        pdf.image(str(LOGO_PATH), x=MARGEN_IZQ, y=y_inicio, w=30)
 
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.cell(0, 6, SITIO_WEB, align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.ln(4)
+    pdf.set_xy(MARGEN_IZQ + 35, y_inicio + 2)
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.set_text_color(*COLOR_PRIMARIO)
+    pdf.cell(70, 8, f"N° {ticket['ticket_id']}", new_x=XPos.LEFT, new_y=YPos.NEXT)
 
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 8, "COMPROBANTE DE ATENCION", align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.ln(4)
-
+    pdf.set_xy(MARGEN_IZQ + 35, y_inicio + 11)
     pdf.set_font("Helvetica", "", 11)
-    pdf.cell(0, 7, f"N Formulario (Ticket): {ticket['ticket_id']}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.cell(0, 7, f"Fecha: {formatear_fecha_hora(ticket.get('ticket_booking_date'))}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.cell(0, 7, f"Clienta: {nombre_titular}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.ln(3)
+    pdf.set_text_color(*COLOR_GRIS_OSCURO)
+    pdf.cell(70, 7, f"Fecha: {formatear_fecha_hora(ticket.get('ticket_booking_date'))}")
 
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-    pdf.ln(2)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 7, "DETALLE DE SERVICIOS", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+    pdf.set_xy(MARGEN_IZQ, y_inicio + 24)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(*COLOR_PRIMARIO)
+    pdf.cell(25, 7, "Clienta:")
+    pdf.set_font("Helvetica", "", 11)
+    pdf.set_text_color(*COLOR_GRIS_OSCURO)
+    pdf.cell(0, 7, nombre_titular, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    pdf.ln(3)
+    _banda(pdf, "DETALLE DE SERVICIOS", COLOR_PRIMARIO)
     pdf.ln(4)
 
     for bloque in bloques:
-        pdf.set_font("Helvetica", "", 11)
-        pdf.cell(0, 6, f"Clienta: {bloque['customer_name']}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.cell(0, 6, f"Te atendio: {bloque['professional_name']}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.cell(0, 6, f"Atencion: {formatear_fecha_hora(bloque['booking_date'])}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.set_x(MARGEN_IZQ)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(*COLOR_SECUNDARIO)
+        pdf.cell(22, 6, "Clienta:")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(*COLOR_GRIS_OSCURO)
+        pdf.cell(0, 6, bloque["customer_name"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+        pdf.set_x(MARGEN_IZQ)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(*COLOR_SECUNDARIO)
+        pdf.cell(22, 6, "Te atendio:")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(*COLOR_GRIS_OSCURO)
+        pdf.cell(0, 6, bloque["professional_name"], new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+        pdf.set_x(MARGEN_IZQ)
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(*COLOR_SECUNDARIO)
+        pdf.cell(22, 6, "Atencion:")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(*COLOR_GRIS_OSCURO)
+        pdf.cell(0, 6, formatear_fecha_hora(bloque["booking_date"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
         pdf.ln(2)
 
         for familia, servicios in bloque["familias"].items():
-            pdf.set_font("Helvetica", "B", 10)
-            pdf.cell(0, 6, f"  {familia}", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_x(MARGEN_IZQ)
+            pdf.set_fill_color(*COLOR_DORADO)
+            pdf.set_text_color(255, 255, 255)
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.cell(60, 6, f"  {familia}", fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
             pdf.set_font("Helvetica", "", 10)
+            pdf.set_text_color(*COLOR_GRIS_OSCURO)
             for servicio in servicios:
+                pdf.set_x(MARGEN_IZQ)
                 pdf.cell(140, 6, f"    {servicio['product_label']}")
+                pdf.set_text_color(*COLOR_PRIMARIO)
+                pdf.set_font("Helvetica", "B", 10)
                 pdf.cell(50, 6, formatear_moneda(servicio["unit_price"]), align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                pdf.set_font("Helvetica", "", 10)
+                pdf.set_text_color(*COLOR_GRIS_OSCURO)
 
         pdf.ln(1)
+        pdf.set_x(MARGEN_IZQ)
+        pdf.set_fill_color(*COLOR_CLARO)
+        pdf.set_text_color(255, 255, 255)
         pdf.set_font("Helvetica", "B", 10)
-        pdf.cell(140, 6, f"  Sub Total {bloque['customer_name']}")
-        pdf.cell(50, 6, formatear_moneda(bloque["subtotal"]), align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-        pdf.ln(2)
-        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+        pdf.cell(140, 7, f"  Sub Total {bloque['customer_name']}", fill=True)
+        pdf.cell(50, 7, formatear_moneda(bloque["subtotal"]), align="R", fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+        pdf.ln(3)
+
+        pdf.set_draw_color(*COLOR_GRIS_CLARO)
+        pdf.set_line_width(0.3)
+        pdf.line(MARGEN_IZQ, pdf.get_y(), MARGEN_DER, pdf.get_y())
         pdf.ln(4)
 
-    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(*COLOR_GRIS_OSCURO)
+    pdf.set_x(MARGEN_IZQ)
+    pdf.set_font("Helvetica", "B", 11)
     pdf.cell(140, 7, f"TOTAL GENERAL (Ticket #{ticket['ticket_id']})")
     pdf.cell(50, 7, formatear_moneda(total_general), align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.set_font("Helvetica", "", 11)
+
+    pdf.set_x(MARGEN_IZQ)
+    pdf.set_font("Helvetica", "", 10)
     pdf.cell(140, 7, "Abono")
     pdf.cell(50, 7, formatear_moneda(abono), align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(140, 7, "TOTAL A PAGAR")
-    pdf.cell(50, 7, formatear_moneda(total_a_pagar), align="R", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    pdf.ln(1)
+    pdf.set_x(MARGEN_IZQ)
+    pdf.set_fill_color(*COLOR_PRIMARIO)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.cell(140, 10, "  TOTAL A PAGAR", fill=True)
+    pdf.cell(50, 10, formatear_moneda(total_a_pagar), align="R", fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    # Pie de pagina con el sitio web, igual al formulario de papel
+    pdf.set_auto_page_break(auto=False)
+    pdf.set_y(-20)
+    pdf.set_x(MARGEN_IZQ)
+    pdf.set_fill_color(*COLOR_PRIMARIO)
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.cell(ANCHO_CONTENIDO, 8, SITIO_WEB, align="C", fill=True, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     pdf_bytes = bytes(pdf.output())
 

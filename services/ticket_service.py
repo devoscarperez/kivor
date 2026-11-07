@@ -26,6 +26,7 @@ VALID_STATUSES = ["Inactive", "Assigned", "Started", "Completed", "Approved", "F
 
 TICKET_LIST_RESULT_COLUMNS = TICKET_COLUMNS + [
     "customer_full_name", "customer_nickname", "customer_mobile", "professional_count",
+    "whatsapp_sent", "sent_date",
 ]
 
 
@@ -93,7 +94,8 @@ def list_tickets(
         SELECT t.id, t.status, t.created_at, t.updated_at,
                t.status_changed_at, t.customer_id, t.booking_date,
                c.customer_full_name, c.customer_nickname, c.customer_mobile,
-               (SELECT COUNT(*) FROM {schema}.ticket_professional tp2 WHERE tp2.ticket_id = t.id) AS professional_count
+               (SELECT COUNT(*) FROM {schema}.ticket_professional tp2 WHERE tp2.ticket_id = t.id) AS professional_count,
+               t.whatsapp_sent, t.sent_date
         FROM {schema}.ticket t
         LEFT JOIN {schema}.customer c ON c.customer_id = t.customer_id
         WHERE {conditions}
@@ -193,6 +195,37 @@ def set_ticket_status(tenant_schema: str, ticket_id: int, status: str) -> dict:
         raise Exception("ticket_not_found")
 
     return dict(zip(TICKET_COLUMNS, row))
+
+
+def registrar_envio_whatsapp(tenant_schema: str, ticket_id: int, username: str) -> dict:
+    tenant_schema = _validated_schema(tenant_schema)
+
+    update_query = sql.SQL("""
+        UPDATE {schema}.ticket
+        SET whatsapp_sent = %s,
+            sent_date = NOW()
+        WHERE id = %s AND whatsapp_sent IS NULL
+        RETURNING whatsapp_sent, sent_date
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    select_query = sql.SQL("""
+        SELECT whatsapp_sent, sent_date FROM {schema}.ticket WHERE id = %s
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(update_query, (username, ticket_id))
+            row = cur.fetchone()
+
+            if not row:
+                cur.execute(select_query, (ticket_id,))
+                row = cur.fetchone()
+        conn.commit()
+
+    if not row:
+        raise Exception("ticket_not_found")
+
+    return {"whatsapp_sent": row[0], "sent_date": row[1]}
 
 
 def set_ticket_booking_date(tenant_schema: str, ticket_id: int, booking_date: datetime) -> dict:

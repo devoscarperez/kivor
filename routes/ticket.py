@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from core.security import verify_token
 from services.ticket_service import (
     create_ticket, list_tickets, set_ticket_customer, get_ticket, set_ticket_booking_date,
-    set_ticket_status,
+    set_ticket_status, registrar_envio_whatsapp,
 )
 from services.ticket_voucher_service import generar_voucher_pdf, generar_voucher_imagen
 
@@ -92,6 +92,14 @@ def get_ticket_voucher_imagen(ticket_id: int, current_user: dict = Depends(verif
             media_type="image/png",
             headers={"Content-Disposition": f'inline; filename="{nombre_imagen}"'},
         )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{ticket_id}/whatsapp-sent")
+def post_ticket_whatsapp_sent(ticket_id: int, current_user: dict = Depends(verify_token)):
+    try:
+        return registrar_envio_whatsapp(current_user["tenant_schema"], ticket_id, current_user["username"])
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

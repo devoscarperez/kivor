@@ -3,6 +3,7 @@
 import unicodedata
 from pathlib import Path
 
+import pymupdf
 from fpdf import FPDF
 from fpdf.enums import XPos, YPos
 from psycopg import sql
@@ -202,3 +203,16 @@ def generar_voucher_pdf(tenant_schema: str, ticket_id: int) -> tuple:
     nombre_archivo = f"{nombre_clienta_slug}_{ticket['ticket_id']}_{booking_slug}.pdf"
 
     return pdf_bytes, nombre_archivo
+
+
+def generar_voucher_imagen(tenant_schema: str, ticket_id: int) -> tuple:
+    pdf_bytes, nombre_archivo = generar_voucher_pdf(tenant_schema, ticket_id)
+
+    documento = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    pixmap = documento[0].get_pixmap(dpi=150)
+    png_bytes = pixmap.tobytes("png")
+    documento.close()
+
+    nombre_imagen = nombre_archivo.rsplit(".", 1)[0] + ".png"
+
+    return png_bytes, nombre_imagen

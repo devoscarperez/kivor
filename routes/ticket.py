@@ -8,7 +8,7 @@ from services.ticket_service import (
     create_ticket, list_tickets, set_ticket_customer, get_ticket, set_ticket_booking_date,
     set_ticket_status,
 )
-from services.ticket_voucher_service import generar_voucher_pdf
+from services.ticket_voucher_service import generar_voucher_pdf, generar_voucher_imagen
 
 router = APIRouter(prefix="/ticket", tags=["Ticket"])
 
@@ -78,6 +78,19 @@ def get_ticket_voucher(ticket_id: int, current_user: dict = Depends(verify_token
             content=pdf_bytes,
             media_type="application/pdf",
             headers={"Content-Disposition": f'attachment; filename="{nombre_archivo}"'},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{ticket_id}/voucher-imagen")
+def get_ticket_voucher_imagen(ticket_id: int, current_user: dict = Depends(verify_token)):
+    try:
+        png_bytes, nombre_imagen = generar_voucher_imagen(current_user["tenant_schema"], ticket_id)
+        return Response(
+            content=png_bytes,
+            media_type="image/png",
+            headers={"Content-Disposition": f'inline; filename="{nombre_imagen}"'},
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -26,7 +26,7 @@ VALID_STATUSES = ["Inactive", "Assigned", "Started", "Completed", "Approved", "F
 
 TICKET_LIST_RESULT_COLUMNS = TICKET_COLUMNS + [
     "customer_full_name", "customer_nickname", "customer_mobile", "professional_count",
-    "whatsapp_sent", "sent_date",
+    "professional_aliases", "whatsapp_sent", "sent_date",
 ]
 
 
@@ -95,6 +95,17 @@ def list_tickets(
                t.status_changed_at, t.customer_id, t.booking_date,
                c.customer_full_name, c.customer_nickname, c.customer_mobile,
                (SELECT COUNT(*) FROM {schema}.ticket_professional tp2 WHERE tp2.ticket_id = t.id) AS professional_count,
+               (SELECT ARRAY_AGG(alias ORDER BY primera_fecha)
+                FROM (
+                    SELECT COALESCE(p.professional_nickname, p.professional_name) AS alias,
+                           MIN(tpc.booking_date) AS primera_fecha
+                    FROM {schema}.ticket_professional tp3
+                    JOIN core.professional p ON p.professional_id = tp3.professional_id
+                    LEFT JOIN {schema}.ticket_professional_customer tpc ON tpc.ticket_professional_id = tp3.id
+                    WHERE tp3.ticket_id = t.id
+                    GROUP BY p.professional_id, COALESCE(p.professional_nickname, p.professional_name)
+                ) agg
+               ) AS professional_aliases,
                t.whatsapp_sent, t.sent_date
         FROM {schema}.ticket t
         LEFT JOIN {schema}.customer c ON c.customer_id = t.customer_id

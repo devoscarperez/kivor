@@ -272,19 +272,22 @@ def list_my_agenda_today(tenant_schema: str, professional_id: int, today: date) 
     rows_query = sql.SQL("""
         SELECT tpc.id, tpc.ticket_professional_id, tpc.customer_id,
                c.customer_full_name, c.customer_nickname,
-               tpc.booking_date, tpc.ticket_id, tpc.status
+               tpc.booking_date, tpc.ticket_id, tpc.status, t.status
         FROM {schema}.ticket_professional_customer tpc
         JOIN {schema}.ticket_professional tp ON tp.id = tpc.ticket_professional_id
         JOIN {schema}.ticket t ON t.id = tpc.ticket_id
         JOIN {schema}.customer c ON c.customer_id = tpc.customer_id
         WHERE tp.professional_id = %s
           AND t.booking_date::date = %s
-        ORDER BY CASE WHEN tpc.status = 'Assigned' THEN 0 ELSE 1 END, tpc.booking_date ASC
+          AND t.status = ANY(%s)
+        ORDER BY CASE WHEN t.status = 'Started' THEN 0 ELSE 1 END,
+                 CASE WHEN tpc.status = 'Assigned' THEN 0 ELSE 1 END,
+                 tpc.booking_date ASC
     """).format(schema=sql.Identifier(tenant_schema))
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(rows_query, (professional_id, today))
+            cur.execute(rows_query, (professional_id, today, ["Started", "Completed"]))
             rows = cur.fetchall()
 
             items = [
@@ -297,6 +300,7 @@ def list_my_agenda_today(tenant_schema: str, professional_id: int, today: date) 
                     "booking_date": row[5],
                     "ticket_id": row[6],
                     "ticket_professional_customer_status": row[7],
+                    "ticket_status": row[8],
                     "products": [],
                 }
                 for row in rows

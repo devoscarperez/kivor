@@ -244,13 +244,39 @@ def complete_ticket_professional_customer(tenant_schema: str, ticket_professiona
             changed_at = NOW(),
             updated_at = NOW()
         WHERE id = %s AND status = 'Assigned'
-        RETURNING id, customer_id, status, booking_date
+        RETURNING id, customer_id, status, booking_date, ticket_id
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    # Si esta era la ultima atencion pendiente del ticket (todas sus
+    # profesionales asignadas tienen ya todas sus atenciones en Completed),
+    # el ticket pasa automaticamente a Completed en la misma transaccion.
+    complete_ticket_query = sql.SQL("""
+        UPDATE {schema}.ticket t
+        SET status = 'Completed',
+            status_changed_at = NOW(),
+            updated_at = NOW()
+        WHERE t.id = %s
+          AND t.status = 'Started'
+          AND EXISTS (
+              SELECT 1 FROM {schema}.ticket_professional tp WHERE tp.ticket_id = t.id
+          )
+          AND NOT EXISTS (
+              SELECT 1 FROM {schema}.ticket_professional tp
+              WHERE tp.ticket_id = t.id
+                AND NOT EXISTS (
+                    SELECT 1 FROM {schema}.ticket_professional_customer tpc
+                    WHERE tpc.ticket_professional_id = tp.id AND tpc.status = 'Completed'
+                )
+          )
     """).format(schema=sql.Identifier(tenant_schema))
 
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(query, (ticket_professional_customer_id,))
             row = cur.fetchone()
+
+            if row:
+                cur.execute(complete_ticket_query, (row[4],))
         conn.commit()
 
     if not row:

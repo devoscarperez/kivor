@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from core.security import verify_token
 from services.ticket_service import (
     create_ticket, list_tickets, set_ticket_customer, get_ticket, set_ticket_booking_date,
-    set_ticket_status, registrar_envio_whatsapp,
+    set_ticket_status, set_ticket_booking_deposit, registrar_envio_whatsapp,
 )
 from services.ticket_voucher_service import generar_voucher_pdf, generar_voucher_imagen
 
@@ -15,6 +15,9 @@ router = APIRouter(prefix="/ticket", tags=["Ticket"])
 
 class SetCustomerBody(BaseModel):
     customer_id: int
+
+
+class SetBookingDepositBody(BaseModel):
     booking_deposit: int = Field(ge=0, le=99999)
 
 
@@ -112,7 +115,19 @@ def patch_ticket_customer(
     current_user: dict = Depends(verify_token),
 ):
     try:
-        return set_ticket_customer(current_user["tenant_schema"], ticket_id, body.customer_id, body.booking_deposit)
+        return set_ticket_customer(current_user["tenant_schema"], ticket_id, body.customer_id)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.patch("/{ticket_id}/booking-deposit")
+def patch_ticket_booking_deposit(
+    ticket_id: int,
+    body: SetBookingDepositBody,
+    current_user: dict = Depends(verify_token),
+):
+    try:
+        return set_ticket_booking_deposit(current_user["tenant_schema"], ticket_id, body.booking_deposit)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

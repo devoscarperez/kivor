@@ -153,18 +153,12 @@ def get_ticket(tenant_schema: str, ticket_id: int) -> dict:
     return dict(zip(TICKET_LIST_RESULT_COLUMNS[:-1], row))
 
 
-def set_ticket_customer(tenant_schema: str, ticket_id: int, customer_id: int, booking_deposit: int) -> dict:
+def set_ticket_customer(tenant_schema: str, ticket_id: int, customer_id: int) -> dict:
     tenant_schema = _validated_schema(tenant_schema)
-
-    if booking_deposit is None or not (BOOKING_DEPOSIT_MIN <= booking_deposit <= BOOKING_DEPOSIT_MAX):
-        raise Exception(
-            f"booking_deposit inválido: debe ser un entero entre {BOOKING_DEPOSIT_MIN} y {BOOKING_DEPOSIT_MAX}."
-        )
 
     query = sql.SQL("""
         UPDATE {schema}.ticket
         SET customer_id = %s,
-            booking_deposit = %s,
             updated_at = NOW(),
             status_changed_at = CASE WHEN status = 'Inactive' THEN NOW() ELSE status_changed_at END,
             status = CASE WHEN status = 'Inactive' THEN 'Assigned' ELSE status END
@@ -177,7 +171,38 @@ def set_ticket_customer(tenant_schema: str, ticket_id: int, customer_id: int, bo
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(query, (customer_id, booking_deposit, ticket_id))
+            cur.execute(query, (customer_id, ticket_id))
+            row = cur.fetchone()
+        conn.commit()
+
+    if not row:
+        raise Exception("ticket_not_found")
+
+    return dict(zip(TICKET_COLUMNS, row))
+
+
+def set_ticket_booking_deposit(tenant_schema: str, ticket_id: int, booking_deposit: int) -> dict:
+    tenant_schema = _validated_schema(tenant_schema)
+
+    if booking_deposit is None or not (BOOKING_DEPOSIT_MIN <= booking_deposit <= BOOKING_DEPOSIT_MAX):
+        raise Exception(
+            f"booking_deposit inválido: debe ser un entero entre {BOOKING_DEPOSIT_MIN} y {BOOKING_DEPOSIT_MAX}."
+        )
+
+    query = sql.SQL("""
+        UPDATE {schema}.ticket
+        SET booking_deposit = %s,
+            updated_at = NOW()
+        WHERE id = %s
+        RETURNING {columns}
+    """).format(
+        schema=sql.Identifier(tenant_schema),
+        columns=sql.SQL(", ").join(sql.Identifier(c) for c in TICKET_DB_COLUMNS),
+    )
+
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(query, (booking_deposit, ticket_id))
             row = cur.fetchone()
         conn.commit()
 

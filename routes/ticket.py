@@ -1,7 +1,7 @@
 from datetime import date, datetime
 
 from fastapi import APIRouter, HTTPException, Depends, Query, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.security import verify_token
 from services.ticket_service import (
@@ -15,6 +15,7 @@ router = APIRouter(prefix="/ticket", tags=["Ticket"])
 
 class SetCustomerBody(BaseModel):
     customer_id: int
+    booking_deposit: int = Field(ge=0, le=99999)
 
 
 class CreateTicketBody(BaseModel):
@@ -111,7 +112,7 @@ def patch_ticket_customer(
     current_user: dict = Depends(verify_token),
 ):
     try:
-        return set_ticket_customer(current_user["tenant_schema"], ticket_id, body.customer_id)
+        return set_ticket_customer(current_user["tenant_schema"], ticket_id, body.customer_id, body.booking_deposit)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

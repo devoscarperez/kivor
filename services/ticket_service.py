@@ -12,15 +12,18 @@ from core.db import get_connection
 TICKET_COLUMNS = [
     "ticket_id", "ticket_status", "ticket_created_at",
     "ticket_updated_at", "ticket_status_changed_at", "ticket_customer_id",
-    "ticket_booking_date",
+    "ticket_booking_date", "ticket_booking_deposit",
 ]
 
 # Columnas reales de lindasylunaticas.ticket, en el mismo orden que TICKET_COLUMNS.
 TICKET_DB_COLUMNS = [
     "id", "status", "created_at",
     "updated_at", "status_changed_at", "customer_id",
-    "booking_date",
+    "booking_date", "booking_deposit",
 ]
+
+BOOKING_DEPOSIT_MIN = 0
+BOOKING_DEPOSIT_MAX = 99999
 
 VALID_STATUSES = ["Inactive", "Assigned", "Started", "Completed", "Approved", "Finished"]
 
@@ -92,7 +95,7 @@ def list_tickets(
 
     query = sql.SQL("""
         SELECT t.id, t.status, t.created_at, t.updated_at,
-               t.status_changed_at, t.customer_id, t.booking_date,
+               t.status_changed_at, t.customer_id, t.booking_date, t.booking_deposit,
                c.customer_full_name, c.customer_nickname, c.customer_mobile,
                (SELECT COUNT(*) FROM {schema}.ticket_professional tp2 WHERE tp2.ticket_id = t.id) AS professional_count,
                (SELECT ARRAY_AGG(alias ORDER BY primera_fecha)
@@ -130,7 +133,7 @@ def get_ticket(tenant_schema: str, ticket_id: int) -> dict:
 
     query = sql.SQL("""
         SELECT t.id, t.status, t.created_at, t.updated_at,
-               t.status_changed_at, t.customer_id, t.booking_date,
+               t.status_changed_at, t.customer_id, t.booking_date, t.booking_deposit,
                c.customer_full_name, c.customer_nickname, c.customer_mobile
         FROM {schema}.ticket t
         LEFT JOIN {schema}.customer c ON c.customer_id = t.customer_id
@@ -150,12 +153,18 @@ def get_ticket(tenant_schema: str, ticket_id: int) -> dict:
     return dict(zip(TICKET_LIST_RESULT_COLUMNS[:-1], row))
 
 
-def set_ticket_customer(tenant_schema: str, ticket_id: int, customer_id: int) -> dict:
+def set_ticket_customer(tenant_schema: str, ticket_id: int, customer_id: int, booking_deposit: int) -> dict:
     tenant_schema = _validated_schema(tenant_schema)
+
+    if booking_deposit is None or not (BOOKING_DEPOSIT_MIN <= booking_deposit <= BOOKING_DEPOSIT_MAX):
+        raise Exception(
+            f"booking_deposit inválido: debe ser un entero entre {BOOKING_DEPOSIT_MIN} y {BOOKING_DEPOSIT_MAX}."
+        )
 
     query = sql.SQL("""
         UPDATE {schema}.ticket
         SET customer_id = %s,
+            booking_deposit = %s,
             updated_at = NOW(),
             status_changed_at = CASE WHEN status = 'Inactive' THEN NOW() ELSE status_changed_at END,
             status = CASE WHEN status = 'Inactive' THEN 'Assigned' ELSE status END
@@ -168,7 +177,7 @@ def set_ticket_customer(tenant_schema: str, ticket_id: int, customer_id: int) ->
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(query, (customer_id, ticket_id))
+            cur.execute(query, (customer_id, booking_deposit, ticket_id))
             row = cur.fetchone()
         conn.commit()
 

@@ -1,0 +1,120 @@
+Este es el estado exacto de nuestra POC de análisis de datos del salón mediante ChatGPT + MCP + PostgreSQL.
+Objetivo de la POC
+Demostrar que podemos conversar normalmente con ChatGPT y preguntarle, por ejemplo:
+“Analiza las ventas de 2026. ¿Qué aspectos te parecen relevantes?”
+
+sin construir previamente un reporte ni programar ese análisis.
+La arquitectura que estamos probando es:
+OSCAR
+  │
+  │ lenguaje natural
+  ▼
+CHATGPT PLUS
+  │
+  │ obtener_ventas(año=2026)
+  ▼
+MCP SIMPLE
+  │
+  │ SQL parametrizado
+  ▼
+POSTGRESQL - RENDER
+  │
+  │ datos reales
+  ▼
+MCP
+  │
+  ▼
+CHATGPT
+  │
+  ├── analiza
+  ├── calcula
+  ├── compara
+  ├── interpreta
+  └── puede visualizar
+  ▼
+OSCAR
+
+La idea fundamental es que el MCP obtiene los datos; ChatGPT hace libremente el análisis solicitado.
+Lo que ya hicimos ✅
+1. PostgreSQL ya está funcionando en Render.
+La fuente inicial para nuestra prueba es:
+core.stg_ventas_lyl
+
+Utilizaremos solamente tres campos:
+fecha_entrega
+familia
+ganancia_salon
+
+2. Definimos la consulta mínima.
+El usuario solamente indicará el año.
+El query será conceptualmente:
+SELECT
+    fecha_entrega,
+    familia,
+    ganancia_salon
+FROM core.stg_ventas_lyl
+WHERE EXTRACT(YEAR FROM fecha_entrega) = :anio
+ORDER BY fecha_entrega;
+
+Por ejemplo:
+“Analiza las ventas de 2026.”
+
+ChatGPT determinará:
+año = 2026
+
+y llamará a la herramienta:
+obtener_ventas(2026)
+
+3. Decidimos dónde vive el SQL.
+Para esta POC, ChatGPT NO genera SQL.
+El SQL estará físicamente dentro del programa MCP.
+Eso nos permite hacer una prueba muy controlada.
+4. Creamos un usuario PostgreSQL exclusivo para el MCP.
+Creamos:
+mcp_simple
+
+y le otorgamos únicamente acceso:
+USAGE → schema core
+SELECT → core.stg_ventas_lyl
+
+5. Probamos la seguridad desde DBeaver.
+Ya comprobamos:
+Conexión con mcp_simple        ✅
+SELECT sobre stg_ventas_lyl    ✅
+DELETE                         ❌ bloqueado
+
+Por lo tanto, aunque hubiera un error en el MCP, ese usuario no puede modificar las ventas.
+Lo que sigue
+Ahora dejamos PostgreSQL tranquilo. La siguiente etapa es construir el MCP.
+La secuencia será:
+1. Crear proyecto simple-mcp.
+2. Crear server.py.
+3. Crear la herramienta MCP obtener_ventas(anio).
+4. Incorporar dentro de esa herramienta nuestro SQL parametrizado.
+5. Conectar Python con PostgreSQL usando mcp_simple.
+6. Probar localmente que obtener_ventas(2026) devuelve los datos.
+7. Subir el proyecto a GitHub.
+8. Crear el servicio MCP en Render.
+9. Guardar las credenciales PostgreSQL como variables de entorno en Render; las contraseñas nunca irán a GitHub.
+10. Obtener una dirección HTTPS para nuestro MCP, conceptualmente:
+https://simple-mcp.onrender.com/mcp
+
+11. Conectar ese MCP con tu ChatGPT Plus.
+12. Hacer nuestra primera consulta real desde ChatGPT.
+La prueba de fuego será escribir algo que nosotros nunca hayamos programado, por ejemplo:
+“Analiza las ventas de 2026. Calcula el total y promedio mensual, identifica los meses más fuertes y débiles, analiza el comportamiento de las familias y dime qué cosas te llaman la atención.”
+
+El MCP no sabrá hacer ninguno de esos análisis. Solamente entregará los registros correspondientes a 2026.
+Si ChatGPT obtiene esos datos y responde correctamente, habremos demostrado lo importante:
+pregunta no programada → datos reales → análisis no programado → respuesta.
+Y después podremos pedir:
+“Ahora grafícalo.”
+
+“Compara el primer semestre contra el segundo.”
+
+“¿Qué familias explican principalmente la diferencia?”
+
+“¿Ves alguna anomalía?”
+
+sin haber construido cuatro reportes diferentes.
+Ese es precisamente el concepto que queremos validar antes de ampliar Simple a más tablas, más indicadores, SQL dinámico o una interfaz propia.

@@ -148,7 +148,7 @@ def generar_voucher_pdf(tenant_schema: str, ticket_id: int) -> tuple:
     bloques = _obtener_bloques(tenant_schema, ticket_id)
 
     total_general = sum(b["subtotal"] for b in bloques)
-    abono = 0
+    abono = ticket.get("ticket_booking_deposit") or 0
     total_a_pagar = total_general - abono
 
     nombre_titular = ticket.get("customer_full_name") or ticket.get("customer_nickname") or "(sin nombre)"

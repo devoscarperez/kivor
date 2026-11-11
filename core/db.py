@@ -1,10 +1,9 @@
 import os
+import psycopg
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
-from psycopg_pool import ConnectionPool
 
-
-def _clean_database_url() -> str:
+def get_connection():
     database_url = os.getenv("DATABASE_URL")
 
     if not database_url:
@@ -18,7 +17,7 @@ def _clean_database_url() -> str:
 
     new_query = urlencode(query, doseq=True)
 
-    return urlunparse((
+    clean_url = urlunparse((
         parsed.scheme,
         parsed.netloc,
         parsed.path,
@@ -27,27 +26,11 @@ def _clean_database_url() -> str:
         parsed.fragment
     ))
 
+    conn = psycopg.connect(clean_url)
+    with conn.cursor() as cur:
+        cur.execute("SET TIME ZONE 'America/Santiago'")
 
-def _configurar_conexion(conn):
-    conn.execute("SET TIME ZONE 'America/Santiago'")
-
-
-# min_size=0: no abre conexiones hasta que se necesiten (evita que el
-# arranque del backend falle si la BD tarda en responder). max_size bajo
-# a propósito: la BD en Render (free tier) tiene un límite de conexiones
-# simultáneas compartido con otras herramientas (ej. DBeaver); antes de
-# este pool, cada request abría una conexión nueva y podía agotarlo.
-pool = ConnectionPool(
-    conninfo=_clean_database_url(),
-    min_size=0,
-    max_size=5,
-    configure=_configurar_conexion,
-    open=True,
-)
-
-
-def get_connection():
-    return pool.connection()
+    return conn
 
 
 def set_tenant_schema(conn, schema):

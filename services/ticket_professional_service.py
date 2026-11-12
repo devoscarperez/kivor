@@ -482,6 +482,8 @@ def _agregar_servicio_descuento_automatico(
         return
 
     descuento_service_master_id, descuento_clave, descuento_precio_lista, descuento_precio_profesional = descuento_row
+    descuento_precio_lista = descuento_precio_lista or 0
+    descuento_precio_profesional = descuento_precio_profesional or 0
 
     insert_descuento_query = sql.SQL("""
         INSERT INTO {schema}.ticket_professional_customer_product

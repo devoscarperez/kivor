@@ -5,6 +5,10 @@ from datetime import date, datetime
 from psycopg import sql
 
 from core.db import get_connection
+from services.precios_servicios_service import VIGENCIA_ACTUAL_TEMPORAL
+
+DISCOUNT_PREFIX = "DESC_"
+DISCOUNT_INDICATOR = "D"
 
 
 def _validated_schema(tenant_schema: str) -> str:
@@ -411,6 +415,11 @@ def add_ticket_professional_customer_product(
                 product_id, product_name, quantity, unit_price, professional_unit_price,
             ))
             row = cur.fetchone()
+
+            _agregar_servicio_descuento_automatico(
+                cur, tenant_schema, ticket_id, ticket_professional_id,
+                ticket_professional_customer_id, product_id,
+            )
         conn.commit()
 
     return {
@@ -421,6 +430,71 @@ def add_ticket_professional_customer_product(
         "unit_price": row[4],
         "professional_unit_price": row[5],
     }
+
+
+def _agregar_servicio_descuento_automatico(
+    cur, tenant_schema: str, ticket_id: int, ticket_professional_id: int,
+    ticket_professional_customer_id: int, product_id: int,
+) -> None:
+    indicador_query = sql.SQL("""
+        SELECT id_discount FROM {schema}.precios_servicios
+        WHERE service_master_id = %s AND vigencia = %s
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    cur.execute(indicador_query, (product_id, VIGENCIA_ACTUAL_TEMPORAL))
+    indicador_row = cur.fetchone()
+
+    if not indicador_row or (indicador_row[0] or "").strip().upper() != DISCOUNT_INDICATOR:
+        return
+
+    niveles_query = sql.SQL("""
+        SELECT family, level2, level3, level4 FROM {schema}.product_master WHERE id = %s
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    cur.execute(niveles_query, (product_id,))
+    niveles_row = cur.fetchone()
+
+    if not niveles_row:
+        return
+
+    def con_prefijo(valor):
+        return f"{DISCOUNT_PREFIX}{valor}" if valor else valor
+
+    familia_desc, nivel_2_desc, nivel_3_desc, nivel_4_desc = (con_prefijo(v) for v in niveles_row)
+
+    descuento_query = sql.SQL("""
+        SELECT service_master_id, clave, precio_lista, precio_profesional
+        FROM {schema}.precios_servicios
+        WHERE vigencia = %s AND servicio = true
+          AND familia IS NOT DISTINCT FROM %s
+          AND nivel_2 IS NOT DISTINCT FROM %s
+          AND nivel_3 IS NOT DISTINCT FROM %s
+          AND nivel_4 IS NOT DISTINCT FROM %s
+        LIMIT 1
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    cur.execute(descuento_query, (
+        VIGENCIA_ACTUAL_TEMPORAL, familia_desc, nivel_2_desc, nivel_3_desc, nivel_4_desc,
+    ))
+    descuento_row = cur.fetchone()
+
+    if not descuento_row:
+        return
+
+    descuento_service_master_id, descuento_clave, descuento_precio_lista, descuento_precio_profesional = descuento_row
+
+    insert_descuento_query = sql.SQL("""
+        INSERT INTO {schema}.ticket_professional_customer_product
+            (ticket_id, ticket_professional_id, ticket_professional_customer_id,
+             product_id, product_name, quantity, unit_price, professional_unit_price)
+        VALUES (%s, %s, %s, %s, %s, 1, %s, %s)
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    cur.execute(insert_descuento_query, (
+        ticket_id, ticket_professional_id, ticket_professional_customer_id,
+        descuento_service_master_id, descuento_clave,
+        descuento_precio_lista, descuento_precio_profesional,
+    ))
 
 
 def remove_ticket_professional_customer_product(

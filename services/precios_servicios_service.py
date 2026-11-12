@@ -19,6 +19,10 @@ MES_A_NUMERO = {
 
 NUMERO_A_MES = {numero: mes for mes, numero in MES_A_NUMERO.items()}
 
+# TODO: hardcode temporal mientras solo existe precio cargado para SEP2026.
+# Revertir a vigencia_actual() cuando se cargue la vigencia del mes en curso.
+VIGENCIA_ACTUAL_TEMPORAL = "SEP2026"
+
 
 def vigencia_actual() -> str:
     hoy = date.today()
@@ -268,9 +272,7 @@ def get_opciones_servicio(
     tenant_schema: str, familia: str = None, nivel_2: str = None, nivel_3: str = None
 ) -> dict:
     tenant_schema = _validated_schema(tenant_schema)
-    # TODO: hardcode temporal mientras solo existe precio cargado para SEP2026.
-    # Revertir a vigencia_actual() cuando se cargue la vigencia del mes en curso.
-    vigencia = "SEP2026"
+    vigencia = VIGENCIA_ACTUAL_TEMPORAL
 
     niveles_2 = []
     niveles_3 = []

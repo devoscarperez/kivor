@@ -14,7 +14,7 @@ from services.ticket_professional_service import (
     add_ticket_professional_customer_product,
     remove_ticket_professional_customer_product,
     complete_ticket_professional_customer,
-    aplicar_descuento_ticket_professional_customer,
+    aplicar_descuento_producto,
 )
 
 router = APIRouter(prefix="/ticket/{ticket_id}/professionals", tags=["Ticket Professional"])
@@ -137,16 +137,20 @@ def delete_ticket_professional_customer_product(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/{ticket_professional_id}/customers/{ticket_professional_customer_id}/apply-discount")
-def post_ticket_professional_customer_apply_discount(
+@router.post(
+    "/{ticket_professional_id}/customers/{ticket_professional_customer_id}"
+    "/products/{ticket_professional_customer_product_id}/apply-discount"
+)
+def post_ticket_professional_customer_product_apply_discount(
     ticket_id: int,
     ticket_professional_id: int,
     ticket_professional_customer_id: int,
+    ticket_professional_customer_product_id: int,
     current_user: dict = Depends(verify_token),
 ):
     try:
-        return aplicar_descuento_ticket_professional_customer(
-            current_user["tenant_schema"], ticket_professional_customer_id
+        return aplicar_descuento_producto(
+            current_user["tenant_schema"], ticket_professional_customer_product_id
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -371,13 +371,12 @@ def list_my_agenda_today(tenant_schema: str, professional_id: int, today: date) 
 
             for item in items:
                 product_ids_existentes = {p["product_id"] for p in item["products"]}
-                item["descuento_disponible"] = False
 
-                for product_id in product_ids_existentes:
-                    candidato = _resolver_servicio_descuento(cur, tenant_schema, product_id)
-                    if candidato and candidato["service_master_id"] not in product_ids_existentes:
-                        item["descuento_disponible"] = True
-                        break
+                for producto in item["products"]:
+                    candidato = _resolver_servicio_descuento(cur, tenant_schema, producto["product_id"])
+                    producto["descuento_disponible"] = bool(
+                        candidato and candidato["service_master_id"] not in product_ids_existentes
+                    )
 
     return items
 
@@ -496,22 +495,23 @@ def _resolver_servicio_descuento(cur, tenant_schema: str, product_id: int) -> di
     }
 
 
-def aplicar_descuento_ticket_professional_customer(
-    tenant_schema: str, ticket_professional_customer_id: int
+def aplicar_descuento_producto(
+    tenant_schema: str, ticket_professional_customer_product_id: int
 ) -> dict:
     tenant_schema = _validated_schema(tenant_schema)
 
     info_query = sql.SQL("""
-        SELECT ticket_id, ticket_professional_id, status
-        FROM {schema}.ticket_professional_customer
-        WHERE id = %s
+        SELECT tpcp.ticket_id, tpcp.ticket_professional_id,
+               tpcp.ticket_professional_customer_id, tpcp.product_id, tpc.status
+        FROM {schema}.ticket_professional_customer_product tpcp
+        JOIN {schema}.ticket_professional_customer tpc ON tpc.id = tpcp.ticket_professional_customer_id
+        WHERE tpcp.id = %s
     """).format(schema=sql.Identifier(tenant_schema))
 
     productos_query = sql.SQL("""
         SELECT product_id
         FROM {schema}.ticket_professional_customer_product
         WHERE ticket_professional_customer_id = %s
-        ORDER BY created_at ASC
     """).format(schema=sql.Identifier(tenant_schema))
 
     insert_query = sql.SQL("""
@@ -524,35 +524,32 @@ def aplicar_descuento_ticket_professional_customer(
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(info_query, (ticket_professional_customer_id,))
+            cur.execute(info_query, (ticket_professional_customer_product_id,))
             info_row = cur.fetchone()
 
             if not info_row:
-                raise Exception("ticket_professional_customer_not_found")
+                raise Exception("ticket_professional_customer_product_not_found")
 
-            ticket_id, ticket_professional_id, status = info_row
+            ticket_id, ticket_professional_id, ticket_professional_customer_id, product_id, status = info_row
             if status != "Assigned":
                 raise Exception(
                     "No se puede aplicar el descuento: la atención de esta clienta ya fue finalizada."
                 )
 
+            candidato = _resolver_servicio_descuento(cur, tenant_schema, product_id)
+            if not candidato:
+                raise Exception("Este servicio no tiene un descuento pendiente de aplicar.")
+
             cur.execute(productos_query, (ticket_professional_customer_id,))
             product_ids_existentes = {r[0] for r in cur.fetchall()}
 
-            descuento = None
-            for product_id in product_ids_existentes:
-                candidato = _resolver_servicio_descuento(cur, tenant_schema, product_id)
-                if candidato and candidato["service_master_id"] not in product_ids_existentes:
-                    descuento = candidato
-                    break
-
-            if not descuento:
-                raise Exception("No hay servicios pendientes de aplicar descuento en esta atención.")
+            if candidato["service_master_id"] in product_ids_existentes:
+                raise Exception("El descuento de este servicio ya fue aplicado.")
 
             cur.execute(insert_query, (
                 ticket_id, ticket_professional_id, ticket_professional_customer_id,
-                descuento["service_master_id"], descuento["clave"],
-                descuento["precio_lista"], descuento["precio_profesional"],
+                candidato["service_master_id"], candidato["clave"],
+                candidato["precio_lista"], candidato["precio_profesional"],
             ))
             row = cur.fetchone()
         conn.commit()

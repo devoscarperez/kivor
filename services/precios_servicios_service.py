@@ -46,6 +46,7 @@ COLUMN_MAP_FIJO = {
     "NOMBRE_CORTO": "nombre_corto",
     "DURACION_HORAS": "duracion_horas",
     "PORCENTAJE_PROFESIONAL": "porcentaje_profesional",
+    "INDICADOR_DESCUENTO": "id_discount",
 }
 
 REQUIRED_COLUMNS_FIJAS = ["CLAVE", "FAMILIA"]
@@ -56,7 +57,7 @@ DB_COLUMNS = [
     "duracion_horas", "porcentaje_profesional", "servicio",
     "archivo_origen", "hoja_origen", "fila_excel",
     "precio_fecha_desde", "vigencia", "clave_servicio_vigencia",
-    "service_master_id",
+    "service_master_id", "id_discount",
 ]
 
 

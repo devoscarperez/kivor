@@ -369,6 +369,16 @@ def list_my_agenda_today(tenant_schema: str, professional_id: int, today: date) 
                 for item in items:
                     item["products"] = by_tpc.get(item["ticket_professional_customer_id"], [])
 
+            for item in items:
+                product_ids_existentes = {p["product_id"] for p in item["products"]}
+                item["descuento_disponible"] = False
+
+                for product_id in product_ids_existentes:
+                    candidato = _resolver_servicio_descuento(cur, tenant_schema, product_id)
+                    if candidato and candidato["service_master_id"] not in product_ids_existentes:
+                        item["descuento_disponible"] = True
+                        break
+
     return items
 
 
@@ -415,11 +425,6 @@ def add_ticket_professional_customer_product(
                 product_id, product_name, quantity, unit_price, professional_unit_price,
             ))
             row = cur.fetchone()
-
-            _agregar_servicio_descuento_automatico(
-                cur, tenant_schema, ticket_id, ticket_professional_id,
-                ticket_professional_customer_id, product_id,
-            )
         conn.commit()
 
     return {
@@ -432,10 +437,10 @@ def add_ticket_professional_customer_product(
     }
 
 
-def _agregar_servicio_descuento_automatico(
-    cur, tenant_schema: str, ticket_id: int, ticket_professional_id: int,
-    ticket_professional_customer_id: int, product_id: int,
-) -> None:
+def _resolver_servicio_descuento(cur, tenant_schema: str, product_id: int) -> dict | None:
+    """Si product_id tiene id_discount = 'D', busca el servicio con el mismo
+    nivel (familia/nivel_2/nivel_3/nivel_4) prefijado con DESC_. Devuelve sus
+    datos para poder agregarlo como producto, o None si no aplica."""
     indicador_query = sql.SQL("""
         SELECT id_discount FROM {schema}.precios_servicios
         WHERE service_master_id = %s AND vigencia = %s
@@ -445,7 +450,7 @@ def _agregar_servicio_descuento_automatico(
     indicador_row = cur.fetchone()
 
     if not indicador_row or (indicador_row[0] or "").strip().upper() != DISCOUNT_INDICATOR:
-        return
+        return None
 
     niveles_query = sql.SQL("""
         SELECT family, level2, level3, level4 FROM {schema}.product_master WHERE id = %s
@@ -455,7 +460,7 @@ def _agregar_servicio_descuento_automatico(
     niveles_row = cur.fetchone()
 
     if not niveles_row:
-        return
+        return None
 
     def con_prefijo(valor):
         return f"{DISCOUNT_PREFIX}{valor}" if valor else valor
@@ -479,24 +484,87 @@ def _agregar_servicio_descuento_automatico(
     descuento_row = cur.fetchone()
 
     if not descuento_row:
-        return
+        return None
 
-    descuento_service_master_id, descuento_clave, descuento_precio_lista, descuento_precio_profesional = descuento_row
-    descuento_precio_lista = descuento_precio_lista or 0
-    descuento_precio_profesional = descuento_precio_profesional or 0
+    service_master_id, clave, precio_lista, precio_profesional = descuento_row
 
-    insert_descuento_query = sql.SQL("""
+    return {
+        "service_master_id": service_master_id,
+        "clave": clave,
+        "precio_lista": precio_lista or 0,
+        "precio_profesional": precio_profesional or 0,
+    }
+
+
+def aplicar_descuento_ticket_professional_customer(
+    tenant_schema: str, ticket_professional_customer_id: int
+) -> dict:
+    tenant_schema = _validated_schema(tenant_schema)
+
+    info_query = sql.SQL("""
+        SELECT ticket_id, ticket_professional_id, status
+        FROM {schema}.ticket_professional_customer
+        WHERE id = %s
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    productos_query = sql.SQL("""
+        SELECT product_id
+        FROM {schema}.ticket_professional_customer_product
+        WHERE ticket_professional_customer_id = %s
+        ORDER BY created_at ASC
+    """).format(schema=sql.Identifier(tenant_schema))
+
+    insert_query = sql.SQL("""
         INSERT INTO {schema}.ticket_professional_customer_product
             (ticket_id, ticket_professional_id, ticket_professional_customer_id,
              product_id, product_name, quantity, unit_price, professional_unit_price)
         VALUES (%s, %s, %s, %s, %s, 1, %s, %s)
+        RETURNING id, product_id, product_name, quantity, unit_price, professional_unit_price
     """).format(schema=sql.Identifier(tenant_schema))
 
-    cur.execute(insert_descuento_query, (
-        ticket_id, ticket_professional_id, ticket_professional_customer_id,
-        descuento_service_master_id, descuento_clave,
-        descuento_precio_lista, descuento_precio_profesional,
-    ))
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(info_query, (ticket_professional_customer_id,))
+            info_row = cur.fetchone()
+
+            if not info_row:
+                raise Exception("ticket_professional_customer_not_found")
+
+            ticket_id, ticket_professional_id, status = info_row
+            if status != "Assigned":
+                raise Exception(
+                    "No se puede aplicar el descuento: la atención de esta clienta ya fue finalizada."
+                )
+
+            cur.execute(productos_query, (ticket_professional_customer_id,))
+            product_ids_existentes = {r[0] for r in cur.fetchall()}
+
+            descuento = None
+            for product_id in product_ids_existentes:
+                candidato = _resolver_servicio_descuento(cur, tenant_schema, product_id)
+                if candidato and candidato["service_master_id"] not in product_ids_existentes:
+                    descuento = candidato
+                    break
+
+            if not descuento:
+                raise Exception("No hay servicios pendientes de aplicar descuento en esta atención.")
+
+            cur.execute(insert_query, (
+                ticket_id, ticket_professional_id, ticket_professional_customer_id,
+                descuento["service_master_id"], descuento["clave"],
+                descuento["precio_lista"], descuento["precio_profesional"],
+            ))
+            row = cur.fetchone()
+        conn.commit()
+
+    return {
+        "ticket_professional_customer_product_id": row[0],
+        "product_id": row[1],
+        "product_name": row[2],
+        "quantity": row[3],
+        "unit_price": row[4],
+        "professional_unit_price": row[5],
+    }
 
 
 def remove_ticket_professional_customer_product(

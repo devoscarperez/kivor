@@ -13,6 +13,7 @@ from routes import ticket
 from routes import customer
 from routes import professional
 from routes import ticket_professional
+from routes import barcode_scan
 
 
 from fastapi import FastAPI, HTTPException
@@ -60,6 +61,7 @@ app.include_router(ticket.router)
 app.include_router(customer.router)
 app.include_router(professional.router)
 app.include_router(ticket_professional.router)
+app.include_router(barcode_scan.router)
 
 @app.options("/{full_path:path}")
 def options_handler(full_path: str):
